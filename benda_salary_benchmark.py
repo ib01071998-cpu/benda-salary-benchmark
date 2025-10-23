@@ -5,15 +5,17 @@ from io import StringIO
 from datetime import datetime
 import os
 
-# 📘 הגדרות כלליות
-st.set_page_config(page_title="דו\"ח שכר ארגוני – מודל PRO+", layout="wide")
+# -----------------------------------------------------------
+# 🧭 הגדרות כלליות
+# -----------------------------------------------------------
+st.set_page_config(page_title="MASTER BENCHMARK SYSTEM – PRO ISRAEL", layout="wide")
 
-# 🎨 עיצוב יוקרתי
+# 🎨 עיצוב ברמה בינלאומית
 st.markdown("""
 <style>
 * { direction: rtl; text-align: right; font-family: "Heebo", sans-serif; }
-body { background-color: #f8fafc; }
-h1 { color: #0D47A1; text-align: center; font-weight: 900; margin-bottom: 0px; }
+body { background-color: #f5f7fa; }
+h1 { color: #0D47A1; text-align: center; font-weight: 900; font-size: 36px; margin-bottom: 10px; }
 h3 { color: #1565C0; margin-top: 25px; }
 table {
     width: 100%;
@@ -21,7 +23,7 @@ table {
     margin-top: 25px;
     border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0px 2px 10px rgba(0,0,0,0.05);
+    box-shadow: 0px 3px 10px rgba(0,0,0,0.1);
 }
 th {
     background-color: #1565C0;
@@ -44,6 +46,7 @@ tfoot td {
     background-color: #BBDEFB;
     font-weight: 800;
     color: #0D47A1;
+    border-top: 2px solid #0D47A1;
 }
 .copy-btn {
     background: linear-gradient(90deg, #1E88E5, #42A5F5);
@@ -64,15 +67,20 @@ tfoot td {
 </style>
 """, unsafe_allow_html=True)
 
-# 🧠 חיבור API
+# -----------------------------------------------------------
+# 🧠 הגדרת API
+# -----------------------------------------------------------
 API_KEY = os.getenv("OPENAI_API_KEY")
+if not API_KEY:
+    st.warning("⚠️ לא נמצא מפתח API. הזן אותו כדי להפעיל את המערכת.")
 client = OpenAI(api_key=API_KEY)
 
-# 🧮 חישוב עלות מעסיק
+# -----------------------------------------------------------
+# 🧮 פונקציות חישוב
+# -----------------------------------------------------------
 def calc_employer_cost(salary):
     return round(salary * 1.32, 2)
 
-# 🔢 עיבוד טבלה
 def markdown_to_df(markdown_text):
     lines = [line.strip() for line in markdown_text.splitlines() if "|" in line]
     clean = [line for line in lines if not line.startswith("|-")]
@@ -81,7 +89,6 @@ def markdown_to_df(markdown_text):
     df = df.drop(df.index[0]) if df.iloc[0].str.contains("רכיב").any() else df
     return df
 
-# 🧩 חישוב מסכם מתוך הטבלה
 def calculate_from_table(df):
     numeric_values = []
     for val in df["עלות מעסיק (₪)"]:
@@ -99,57 +106,71 @@ def calculate_from_table(df):
     employer_total = calc_employer_cost(total)
     return round(total, 2), round(employer_total, 2)
 
-# 💬 יצירת דוח GPT
+# -----------------------------------------------------------
+# 💬 מנוע GPT לבנצ'מארק ישראלי
+# -----------------------------------------------------------
 def generate_salary_table(job_title, experience):
     exp_text = "בהתאם לממוצע השוק" if experience == 0 else f"בהתאם לעובד עם {experience} שנות ניסיון"
+
     prompt = f"""
-    צור טבלת שכר מקצועית בעברית, מפורטת במיוחד, עבור המשרה "{job_title}" בישראל.
-    התאם את הנתונים {exp_text}.
-    כלול אך ורק רכיבי שכר ישירים (שכר, עמלות, בונוסים, רכב, סיבוס, קרן השתלמות, ביטוחים וכו׳).
+    צור דו״ח שכר מפורט בעברית, בפורמט טבלאי בלבד, עבור המשרה "{job_title}" בישראל.
+    יש לבצע בנצ'מארק רחב על כלל מקורות השוק המקומיים האפשריים (AllJobs, JobMaster, Drushim, Globes, LMAS, דוחות שכר פומביים וכו׳),
+    בשילוב עם ידע מקצועי עדכני של מודלים גלובליים לתגמול.
 
-    לכל רכיב יש לציין:
-    - טווח שכר / ערך
-    - ממוצע שוק
-    - מנגנון תגמול מלא: חישוב, אחוזים, תקרה, קשר ליעדים, חישוב שנתי/חודשי
-    - פירוט נרחב לרקע הענפי (לדוגמה: יבואנים, טכנולוגיה, מוצרי חשמל)
-    - עלות מעסיק (₪)
-    - אחוז מהעלות הכוללת
+    הצג רק טבלה אינפורמטיבית.
+    כלול רכיבים רלוונטיים בלבד (רכיבי שכר ישירים):
+    - שכר בסיס
+    - עמלות / בונוסים / בונוסים שנתיים
+    - סיבוס / אש״ל
+    - שעות נוספות / כוננויות
+    - רכב חברה (כולל שווי שימוש, דגמים נפוצים, עלות דלק)
+    - ביטוחים, קרן השתלמות, פנסיה
+    - טלפון נייד, מחשב, נסיעות, הבראה, ביגוד מקצועי, אחזקת רכב
+    - כל רכיב אחר שנהוג לשלם במשרות דומות
 
-    סיים בשורה מסכמת לסך הכול.
+    יש לפרט במדויק מנגנוני תגמול לכל רכיב — לדוגמה:
+    "עמלה של 5% מהמכירות החודשיות לאחר סף מכירות של 100,000 ₪"
+    "בונוס שנתי של עד 3 משכורות לפי עמידה ביעדים"
 
-    הפלט בפורמט טבלה בלבד:
+    עמודות חובה:
     | רכיב שכר | טווח שכר (₪) | ממוצע שוק (₪) | מנגנון תגמול / תנאי | פירוט רכיב | עלות מעסיק (₪) | אחוז מעלות כוללת |
+
+    סיים את הדוח בשורה מסכמת הכוללת סה״כ שכר ברוטו וסה״כ עלות מעסיק.
     """
 
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4-turbo",
         messages=[
-            {"role": "system", "content": "אתה אנליסט שכר בכיר בישראל. הפלט הוא טבלה בלבד."},
+            {"role": "system", "content": "אתה אנליסט שכר בכיר בישראל. הפלט שלך הוא טבלה בלבד."},
             {"role": "user", "content": prompt}
         ],
         temperature=0.4,
     )
     return response.choices[0].message.content
 
-# 🧾 ממשק ראשי
-st.title("📊 דו\"ח שכר ארגוני – מודל PRO+")
+# -----------------------------------------------------------
+# 🧾 ממשק משתמש ראשי
+# -----------------------------------------------------------
+st.title("💎 MASTER BENCHMARK SYSTEM – PRO ISRAEL")
+st.caption("מערכת אנליטיקת שכר חכמה ומפורטת עבור השוק הישראלי")
 
 col1, col2 = st.columns([2, 1])
 with col1:
     job_title = st.text_input("שם המשרה:")
 with col2:
-    experience = st.number_input("שנות ניסיון (0 = ממוצע שוק):", min_value=0, max_value=30, value=0, step=1)
+    experience = st.number_input("שנות ניסיון (0 = ממוצע שוק):", min_value=0, max_value=40, value=0, step=1)
 
-# 🕓 היסטוריית חיפושים
 if "history" not in st.session_state:
     st.session_state["history"] = []
 
-# 🚀 הפקת דוח
-if st.button("🔍 הפק דו\"ח שכר"):
+# -----------------------------------------------------------
+# 🚀 הפקת דו״ח
+# -----------------------------------------------------------
+if st.button("🔍 בצע בנצ'מארק שכר"):
     if not job_title.strip():
         st.warning("אנא הזן שם משרה.")
     else:
-        with st.spinner("מפיק דו\"ח מקצועי... אנא המתן..."):
+        with st.spinner("מפיק דו״ח מקצועי... אנא המתן..."):
             report = generate_salary_table(job_title, experience)
             df = markdown_to_df(report)
             total_salary, total_employer = calculate_from_table(df)
@@ -166,19 +187,18 @@ if st.button("🔍 הפק דו\"ח שכר"):
                 }])
                 df = pd.concat([df, summary], ignore_index=True)
 
-            st.success("✅ דו\"ח הופק בהצלחה")
+            st.success("✅ דו״ח הופק בהצלחה")
             st.markdown(df.to_html(escape=False, index=False), unsafe_allow_html=True)
 
             if total_salary:
                 st.markdown(f"""
                 <div style='background-color:#E3F2FD; padding:18px; border-radius:10px; margin-top:20px; text-align:center;'>
-                    <h3 style='margin-bottom:10px;'>💰 סיכום עלות</h3>
+                    <h3 style='margin-bottom:10px;'>💰 סיכום</h3>
                     <p><b>סה״כ שכר ברוטו:</b> {total_salary:,.0f} ₪<br>
                     <b>סה״כ עלות מעסיק:</b> {total_employer:,.0f} ₪</p>
                 </div>
                 """, unsafe_allow_html=True)
 
-            # שמירה בהיסטוריה
             st.session_state["history"].append({
                 "job": job_title,
                 "experience": experience,
@@ -186,7 +206,6 @@ if st.button("🔍 הפק דו\"ח שכר"):
                 "report": report
             })
 
-            # כפתור העתקה
             st.components.v1.html(f"""
             <div style="text-align:center; margin-top:25px;">
                 <button class="copy-btn" onclick="navigator.clipboard.writeText(`{report.replace('`','').replace('"','').replace("'", '')}`);
@@ -194,7 +213,9 @@ if st.button("🔍 הפק דו\"ח שכר"):
             </div>
             """, height=100)
 
-# 📂 הצגת היסטוריה
+# -----------------------------------------------------------
+# 🗂️ היסטוריית דוחות
+# -----------------------------------------------------------
 if st.session_state["history"]:
     st.markdown("### 🕓 היסטוריית דוחות")
     col_h1, col_h2 = st.columns([4, 1])
