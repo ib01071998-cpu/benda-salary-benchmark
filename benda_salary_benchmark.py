@@ -1,52 +1,21 @@
 import streamlit as st
 from openai import OpenAI, OpenAIError
 import os
-import time
 import pandas as pd
 from io import StringIO
 from datetime import datetime
 
-# הגדרות כלליות
-st.set_page_config(page_title="מערכת בנצ'מארק שכר חכמה", layout="centered")
-
-# עיצוב ויזואלי בעברית
+# עיצוב RTL
+st.set_page_config(page_title="דו״ח שכר ארגוני מפורט", layout="centered")
 st.markdown("""
 <style>
 * { direction: rtl; text-align: right; font-family: "Heebo", sans-serif; }
 h1, h2, h3 { color: #1E88E5; }
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 20px;
-    border: 1px solid #E0E0E0;
-}
-th {
-    background-color: #1976D2;
-    color: white;
-    padding: 12px;
-    font-weight: bold;
-    border: 1px solid #BBDEFB;
-    text-align: center;
-}
-td {
-    background-color: #FAFAFA;
-    border: 1px solid #E3F2FD;
-    padding: 10px;
-    text-align: center;
-    vertical-align: middle;
-    font-size: 15px;
-}
+table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+th { background-color: #1976D2; color: white; padding: 10px; text-align: center; }
+td { background-color: #FAFAFA; border: 1px solid #E3F2FD; padding: 8px; text-align: center; }
 tr:nth-child(even) td { background-color: #F5F5F5; }
-.copy-btn {
-    background-color: #42A5F5;
-    color: white;
-    padding: 10px 20px;
-    border-radius: 8px;
-    font-weight: bold;
-    cursor: pointer;
-    border: none;
-    font-size: 16px;
-}
+.copy-btn { background-color: #42A5F5; color: white; padding: 10px 20px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
 .copy-btn:hover { background-color: #1E88E5; }
 </style>
 """, unsafe_allow_html=True)
@@ -55,40 +24,44 @@ tr:nth-child(even) td { background-color: #F5F5F5; }
 API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=API_KEY)
 
-# היסטוריית חיפושים
+# היסטוריה
 if "history" not in st.session_state:
     st.session_state["history"] = []
 
-st.title("💼 מערכת בנצ'מארק שכר חכמה ומפורטת")
-st.markdown("הזן שם משרה בעברית לקבלת טבלת שכר מלאה הכוללת מדרגות ותק, מנגנוני תגמול, שווי רכב וניתוח עלות מעסיק.")
+st.title("💼 דו״ח בנצ'מארק שכר ארגוני – גרסה מפורטת")
+st.markdown("הזן שם משרה כדי להפיק דו״ח מלא הכולל רכיבי שכר, ותק מדויק, הטבות, רכב, והוצאות מעסיק.")
 
-job_title = st.text_input("שם המשרה (לדוגמה: מנהל תפעול, סמנכ״ל מכירות, מנהל לוגיסטיקה):")
+job_title = st.text_input("שם המשרה (לדוגמה: מנהל לוגיסטיקה, סמנכ״ל מכירות):")
 
-# יצירת פרומפט לניתוח השכר
-def analyze_salary_gpt(job_title):
+# פונקציה לשליפת הדו"ח
+def generate_salary_report(job_title):
     prompt = f"""
-    צור טבלת שכר אחת בלבד בפורמט Markdown עבור המשרה "{job_title}" בשוק הישראלי.
+    צור דו״ח שכר מפורט בעברית עבור המשרה "{job_title}" בשוק הישראלי.
 
-    הפלט חייב להיות טבלה אחת בלבד בפורמט הבא:
+    הצג רק טבלה אחת בפורמט Markdown עם העמודות הבאות:
     | רכיב שכר | טווח (מינימום–מקסימום) | ממוצע שוק (₪) | מנגנון תגמול מקובל | הערות / פירוט |
 
     הנחיות:
-    - כלול את הרכיבים: שכר בסיס, עמלות מכירה, בונוסים, סיבוס/תן ביס, טלפון נייד, קרן השתלמות, ביטוח בריאות, פנסיה, רכב חברה.
-    - עבור רכיב **שכר בסיס**, פרט מדרגות לפי ניסיון:
-        - עד 3 שנות ניסיון (Junior)
-        - 3–6 שנות ניסיון (Mid)
-        - מעל 6 שנות ניסיון (Senior)
-      וציין את השכר המקובל לכל רמה (לדוגמה: Junior – 18K, Mid – 23K, Senior – 28K).
-    - במנגנוני תגמול פרט מדרגות עמלות, תקרות, אחוזים, ותנאי זכאות. לדוגמה: “3% עד 200K ₪, 5% מעל”.
-    - ברכיב רכב חברה: ציין גם **שווי רכב מקובל בשוק** (לדוגמה: 180–250 אלף ₪) ודגמים (סקודה סופרב, מאזדה 6, טויוטה קאמרי).
-    - אל תכתוב טקסט חופשי לפני או אחרי – רק טבלה אחת.
+    - שכר בסיס לפי שנות ניסיון מדויקות:
+      • שנה 1 • שנה 3 • שנה 5 • שנה 7 • שנה 10 • שנה 15+
+      וציין שכר ממוצע לכל רמה (לדוגמה: שנה 1 – 15,000 ₪, שנה 5 – 20,500 ₪ וכו׳)
+    - כלול עמלות, בונוסים, סיבוס, קרן השתלמות, ביטוח, טלפון, רכב חברה, מתנות, הבראה, נסיעות, ביגוד, מחשב נייד.
+    - עבור רכב חברה:
+      פרט את כל המרכיבים:
+        • שווי שימוש חודשי
+        • עלות דלק חודשית ממוצעת
+        • שווי רכב בשוק (לדוגמה: 180–250 אלף ₪)
+        • דגמים מקובלים לפי התפקיד
+        • האם הרכב ממומן בליסינג או בבעלות
+    - במנגנוני תגמול פרט מדרגות, אחוזים, תקרות, ותנאי זכאות אמיתיים.
+    - הנתונים צריכים לשקף חברות דומות ל־Benda Magnetic בע״מ (יבואנים, טכנולוגיה, מוצרי חשמל, גאדג׳טים).
     """
 
     try:
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "אתה אנליסט שכר בכיר בישראל. הפלט מוצג למנהלים בכירים וצריך להיות מדויק וברור."},
+                {"role": "system", "content": "אתה יועץ שכר בכיר בישראל. הפלט הוא דו״ח ניהולי אמיתי המוצג להנהלה."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.55,
@@ -101,81 +74,42 @@ def analyze_salary_gpt(job_title):
         st.error(f"שגיאה כללית: {e}")
         return None
 
-# המרת Markdown ל-DataFrame
-def markdown_table_to_df(markdown_text):
-    try:
-        lines = [line.strip() for line in markdown_text.splitlines() if "|" in line]
-        data_lines = [line for line in lines if not line.startswith("|-")]
-        df = pd.read_csv(StringIO("\n".join(data_lines)), sep="|").dropna(axis=1, how="all")
-        df = df.rename(columns=lambda x: x.strip())
-        df = df.drop(df.index[0]) if df.iloc[0].str.contains("רכיב").any() else df
-        return df
-    except Exception as e:
-        st.error(f"שגיאה בעיבוד הטבלה: {e}")
-        return None
+# פונקציה להצגת הדו"ח
+def markdown_table_to_html(report):
+    lines = [line for line in report.splitlines() if "|" in line]
+    data = [line for line in lines if not line.startswith("|-")]
+    df = pd.read_csv(StringIO("\n".join(data)), sep="|").dropna(axis=1, how="all")
+    df = df.rename(columns=lambda x: x.strip())
+    return df
 
-# חישוב עלות מעסיק ממוצעת
-def calculate_employer_cost(df):
-    try:
-        avg_salary = 0
-        for val in df["ממוצע שוק (₪)"]:
-            try:
-                avg_salary = max(avg_salary, float(str(val).replace("₪", "").replace(",", "").strip()))
-            except:
-                continue
-        employer_cost = int(avg_salary * 1.32)
-        return employer_cost
-    except:
-        return None
-
-# הפעלת הניתוח
-if st.button("🔍 הפק טבלת שכר"):
+# הצגת דו"ח
+if st.button("🔍 הפק דו״ח שכר"):
     if not job_title.strip():
         st.warning("אנא הזן שם משרה.")
     else:
-        with st.spinner("מפיק טבלת שכר מקצועית..."):
-            report = analyze_salary_gpt(job_title)
+        with st.spinner("מפיק דו״ח מלא..."):
+            report = generate_salary_report(job_title)
             if report:
-                df = markdown_table_to_df(report)
-                if df is not None:
-                    st.success("✅ הטבלה הופקה בהצלחה")
-                    st.markdown("### 🧾 טבלת שכר מפורטת")
-                    st.markdown(df.to_html(escape=False, index=False), unsafe_allow_html=True)
+                st.success("✅ דו״ח הופק בהצלחה")
+                st.markdown("### 📊 טבלת שכר מלאה")
+                df = markdown_table_to_html(report)
+                st.markdown(df.to_html(escape=False, index=False), unsafe_allow_html=True)
 
-                    # חישוב עלות מעסיק כוללת
-                    employer_cost = calculate_employer_cost(df)
-                    if employer_cost:
-                        st.markdown(f"""
-                        <div style='background:#E3F2FD;padding:15px;border-radius:10px;margin-top:15px;'>
-                        <b>עלות מעסיק כוללת (ממוצעת לפי שוק ישראלי):</b> כ-{employer_cost:,} ₪<br>
-                        <small>כולל פנסיה, ביטוח לאומי, קרן השתלמות, הבראה ושווי רכב ממוצע.</small>
-                        </div>
-                        """, unsafe_allow_html=True)
+                # כפתור העתק דו"ח
+                st.components.v1.html(f"""
+                <div style="text-align:center; margin-top:15px;">
+                    <button class="copy-btn" onclick="navigator.clipboard.writeText(`{report.replace('`','').replace('"','').replace("'", '')}`);
+                    alert('✅ הדו״ח הועתק ללוח!');">📋 העתק דו״ח</button>
+                </div>
+                """, height=100)
 
-                        # טבלת פירוק עלות מעסיק
-                        st.markdown("#### 📊 פירוק עלות מעסיק ממוצעת")
-                        st.table(pd.DataFrame({
-                            "רכיב": ["שכר ברוטו", "פנסיה (6.5%)", "ביטוח לאומי (7.6%)", "קרן השתלמות (7.5%)", "אש\"ל/בונוסים (4%)", "רכב חברה (שווי שוק)"],
-                            "אחוז מהשכר": ["100%", "6.5%", "7.6%", "7.5%", "4%", "שווי 100–250 אלף ₪"],
-                            "הערות": ["שכר חודשי ממוצע", "הפרשת מעביד", "לפי מדרגה ממוצעת", "נהוג בתפקידים בכירים", "מוערך שנתי", "משוקלל לפי דרגה"]
-                        }))
+                st.session_state["history"].append({
+                    "job": job_title,
+                    "time": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                    "report": report
+                })
 
-                    # כפתור העתק דו"ח
-                    st.components.v1.html(f"""
-                        <div style="text-align:center; margin-top:15px;">
-                            <button class="copy-btn" onclick="navigator.clipboard.writeText(`{report.replace('`','').replace('"','').replace("'", '')}`);
-                            alert('✅ הטבלה הועתקה ללוח!');">📋 העתק טבלה</button>
-                        </div>
-                    """, height=100)
-
-                    # שמירה להיסטוריה
-                    st.session_state["history"].append({
-                        "job": job_title,
-                        "time": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                        "report": report
-                    })
-
-# ספריית היסטוריה
+# היסטוריית דוחות
 if st.session_state["history"]:
     st.markdown("### 🕓 היסטוריית דוחות קודמים")
     for item in reversed(st.session_state["history"]):
