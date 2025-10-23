@@ -3,3 +3,5 @@ openai
 beautifulsoup4
 requests
 fpdf2
+matplotlib
+pandas
