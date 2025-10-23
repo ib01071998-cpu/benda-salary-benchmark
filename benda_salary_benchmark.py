@@ -1,5 +1,5 @@
 import streamlit as st
-from openai import OpenAI, RateLimitError, APIError, OpenAIError
+from openai import OpenAI, OpenAIError
 import os
 import time
 import pandas as pd
@@ -7,9 +7,9 @@ from io import StringIO
 from datetime import datetime
 
 # הגדרות כלליות
-st.set_page_config(page_title="טבלת בנצ'מארק שכר מקצועית", layout="centered")
+st.set_page_config(page_title="מערכת בנצ'מארק שכר חכמה", layout="centered")
 
-# עיצוב ויזואלי נקי בעברית
+# עיצוב ויזואלי בעברית
 st.markdown("""
 <style>
 * { direction: rtl; text-align: right; font-family: "Heebo", sans-serif; }
@@ -59,40 +59,46 @@ client = OpenAI(api_key=API_KEY)
 if "history" not in st.session_state:
     st.session_state["history"] = []
 
-st.title("💼 טבלת בנצ'מארק שכר מקצועית ומפורטת")
-st.markdown("הזן שם משרה בעברית כדי להפיק טבלת שכר הכוללת מנגנוני תגמול, פירוט רכב וניתוח עלות מעסיק ממוצעת לפי המשק הישראלי.")
+st.title("💼 מערכת בנצ'מארק שכר חכמה ומפורטת")
+st.markdown("הזן שם משרה בעברית לקבלת טבלת שכר מלאה הכוללת מדרגות ותק, מנגנוני תגמול, שווי רכב וניתוח עלות מעסיק.")
 
-job_title = st.text_input("שם המשרה (לדוגמה: סמנכ״ל מכירות, מנהל לוגיסטיקה, ראש צוות שירות):")
+job_title = st.text_input("שם המשרה (לדוגמה: מנהל תפעול, סמנכ״ל מכירות, מנהל לוגיסטיקה):")
 
-# פונקציה שמדברת עם GPT
+# יצירת פרומפט לניתוח השכר
 def analyze_salary_gpt(job_title):
     prompt = f"""
     צור טבלת שכר אחת בלבד בפורמט Markdown עבור המשרה "{job_title}" בשוק הישראלי.
-    אל תכתוב טקסט לפני או אחרי — רק טבלה אחת בפורמט הבא:
 
+    הפלט חייב להיות טבלה אחת בלבד בפורמט הבא:
     | רכיב שכר | טווח (מינימום–מקסימום) | ממוצע שוק (₪) | מנגנון תגמול מקובל | הערות / פירוט |
 
     הנחיות:
-    - כלול את הרכיבים: שכר בסיס, עמלות מכירה, בונוסים, סיבוס / תן ביס, טלפון נייד, קרן השתלמות, ביטוח בריאות, פנסיה, רכב חברה.
-    - עבור רכיב "רכב חברה": ציין דגמים מקובלים (סקודה סופרב, מאזדה 6, טויוטה קאמרי) וכתוב גם "שווי רכב מקובל בשוק" (לדוגמה: 180,000–250,000 ₪) בנוסף לשווי שימוש חודשי.
-    - במנגנוני תגמול פרט מדרגות עמלות, אחוזים, תקרות בונוס, תנאי זכאות, תדירות תשלום, ודוגמה ריאלית אחת.
-    - הנתונים צריכים להיות תואמים לשוק חברות כמו Benda Magnetic (יבוא, טכנולוגיה, מוצרי חשמל, גאדג'טים).
-
-    התוצאה: טבלה אחת בלבד, מקצועית וברורה, ללא טקסט נוסף.
+    - כלול את הרכיבים: שכר בסיס, עמלות מכירה, בונוסים, סיבוס/תן ביס, טלפון נייד, קרן השתלמות, ביטוח בריאות, פנסיה, רכב חברה.
+    - עבור רכיב **שכר בסיס**, פרט מדרגות לפי ניסיון:
+        - עד 3 שנות ניסיון (Junior)
+        - 3–6 שנות ניסיון (Mid)
+        - מעל 6 שנות ניסיון (Senior)
+      וציין את השכר המקובל לכל רמה (לדוגמה: Junior – 18K, Mid – 23K, Senior – 28K).
+    - במנגנוני תגמול פרט מדרגות עמלות, תקרות, אחוזים, ותנאי זכאות. לדוגמה: “3% עד 200K ₪, 5% מעל”.
+    - ברכיב רכב חברה: ציין גם **שווי רכב מקובל בשוק** (לדוגמה: 180–250 אלף ₪) ודגמים (סקודה סופרב, מאזדה 6, טויוטה קאמרי).
+    - אל תכתוב טקסט חופשי לפני או אחרי – רק טבלה אחת.
     """
 
     try:
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "אתה אנליסט שכר בכיר בישראל. הפלט מוצג למנהלים בכירים וצריך להיות מדויק, ריאלי וברור."},
+                {"role": "system", "content": "אתה אנליסט שכר בכיר בישראל. הפלט מוצג למנהלים בכירים וצריך להיות מדויק וברור."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.5,
+            temperature=0.55,
         )
         return response.choices[0].message.content
+    except OpenAIError as e:
+        st.error(f"שגיאת OpenAI: {e}")
+        return None
     except Exception as e:
-        st.error(f"שגיאה בתקשורת עם OpenAI: {e}")
+        st.error(f"שגיאה כללית: {e}")
         return None
 
 # המרת Markdown ל-DataFrame
@@ -133,12 +139,10 @@ if st.button("🔍 הפק טבלת שכר"):
                 df = markdown_table_to_df(report)
                 if df is not None:
                     st.success("✅ הטבלה הופקה בהצלחה")
-
-                    # הצגת טבלת השכר
-                    st.markdown("### 🧾 טבלת שכר מסכמת")
+                    st.markdown("### 🧾 טבלת שכר מפורטת")
                     st.markdown(df.to_html(escape=False, index=False), unsafe_allow_html=True)
 
-                    # חישוב עלות מעסיק
+                    # חישוב עלות מעסיק כוללת
                     employer_cost = calculate_employer_cost(df)
                     if employer_cost:
                         st.markdown(f"""
@@ -153,10 +157,10 @@ if st.button("🔍 הפק טבלת שכר"):
                         st.table(pd.DataFrame({
                             "רכיב": ["שכר ברוטו", "פנסיה (6.5%)", "ביטוח לאומי (7.6%)", "קרן השתלמות (7.5%)", "אש\"ל/בונוסים (4%)", "רכב חברה (שווי שוק)"],
                             "אחוז מהשכר": ["100%", "6.5%", "7.6%", "7.5%", "4%", "שווי 100–250 אלף ₪"],
-                            "הערות": ["שכר בסיס", "הפרשת מעביד", "לפי מדרגה ממוצעת", "נהוג בתפקידים בכירים", "מוערך שנתי", "משוקלל לפי דרגה"]
+                            "הערות": ["שכר חודשי ממוצע", "הפרשת מעביד", "לפי מדרגה ממוצעת", "נהוג בתפקידים בכירים", "מוערך שנתי", "משוקלל לפי דרגה"]
                         }))
 
-                    # כפתור העתק
+                    # כפתור העתק דו"ח
                     st.components.v1.html(f"""
                         <div style="text-align:center; margin-top:15px;">
                             <button class="copy-btn" onclick="navigator.clipboard.writeText(`{report.replace('`','').replace('"','').replace("'", '')}`);
@@ -170,12 +174,10 @@ if st.button("🔍 הפק טבלת שכר"):
                         "time": datetime.now().strftime("%d/%m/%Y %H:%M"),
                         "report": report
                     })
-                else:
-                    st.markdown(report)
 
 # ספריית היסטוריה
 if st.session_state["history"]:
-    st.markdown("### 🕓 היסטוריית חיפושים")
+    st.markdown("### 🕓 היסטוריית דוחות קודמים")
     for item in reversed(st.session_state["history"]):
         with st.expander(f"{item['job']} — {item['time']}"):
             st.markdown(item["report"])
