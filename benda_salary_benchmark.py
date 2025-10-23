@@ -5,11 +5,12 @@ import matplotlib.pyplot as plt
 import time
 import os
 import io
+import re
 
 # 🔹 הגדרות כלליות
 st.set_page_config(page_title="מערכת שכר ארגונית", layout="centered")
 
-# יישור לימין (RTL)
+# עיצוב RTL ו־UI
 st.markdown(
     """
     <style>
@@ -36,7 +37,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# חיבור ל־OpenAI
+# יצירת לקוח OpenAI
 API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=API_KEY)
 
@@ -45,7 +46,7 @@ st.markdown("הזן שם משרה בעברית ותקבל דו״ח שכר מפו
 
 job_title = st.text_input("שם המשרה (לדוגמה: מנהל לוגיסטיקה, איש מכירות, סמנכ״ל תפעול):")
 
-
+# פונקציה: ניתוח שכר דרך GPT
 def analyze_salary_gpt(job_title):
     prompt = f"""
     אתה אנליסט שכר בכיר בישראל.
@@ -85,7 +86,7 @@ def analyze_salary_gpt(job_title):
     st.error("המערכת עמוסה מדי כרגע או שהמפתח אינו תקין. נסה שוב בעוד מספר דקות.")
     return None
 
-
+# פונקציה: גרף טווח שכר
 def draw_salary_chart(min_salary, avg_salary, max_salary, title):
     fig, ax = plt.subplots()
     categories = ["מינימום", "ממוצע", "מקסימום"]
@@ -97,7 +98,7 @@ def draw_salary_chart(min_salary, avg_salary, max_salary, title):
     plt.grid(axis="y", linestyle="--", alpha=0.5)
     st.pyplot(fig)
 
-
+# לחצן פעולה
 if st.button("🔍 נתח שכר"):
     if not job_title.strip():
         st.warning("אנא הזן שם משרה.")
@@ -108,17 +109,48 @@ if st.button("🔍 נתח שכר"):
                 st.success("✅ הדו״ח מוכן")
                 st.markdown(f"<div class='report-container'>{report}</div>", unsafe_allow_html=True)
 
-                # חילוץ טווחי שכר
-                import re
+                # ניסיון לחלץ טווח שכר
                 salaries = re.findall(r"(\d{4,6})", report)
                 if len(salaries) >= 3:
                     min_sal, avg_sal, max_sal = map(int, salaries[:3])
-                    draw_salary_chart(min_sal, avg_sal, max_sal, job_title)
                 else:
-                    min_sal, avg_sal, max_sal = 8000, 12000, 18000  # ברירת מחדל
+                    min_sal, avg_sal, max_sal = 8000, 12000, 18000  # ערכי ברירת מחדל
 
-                # טבלת ניסיון אינטראקטיבית
+                draw_salary_chart(min_sal, avg_sal, max_sal, job_title)
+
+                # טבלה מסכמת
                 data = {
                     "רמת ניסיון": ["ג׳וניור (0–2)", "ביניים (3–5)", "בכיר (6+)"],
                     "שכר בסיס (ש״ח)": [min_sal, avg_sal, max_sal],
-                    "תגמול משתנ
+                    "תגמול משתנה (ש״ח)": [
+                        int(min_sal * 0.1),
+                        int(avg_sal * 0.15),
+                        int(max_sal * 0.2)
+                    ],
+                    "סה\"כ ממוצע (ש\"ח)": [
+                        int(min_sal * 1.1),
+                        int(avg_sal * 1.15),
+                        int(max_sal * 1.2)
+                    ],
+                    "הערות": ["תפקיד כניסה", "ניסיון בינוני", "ניהול או מומחיות"]
+                }
+
+                df = pd.DataFrame(data)
+                st.subheader("📊 טבלת שכר לפי רמות ניסיון")
+                st.dataframe(df, use_container_width=True)
+
+                # ייצוא לאקסל
+                buffer = io.BytesIO()
+                with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+                    df.to_excel(writer, index=False, sheet_name="Salary Table")
+                    writer.close()
+
+                st.download_button(
+                    label="⬇️ הורד כקובץ Excel",
+                    data=buffer.getvalue(),
+                    file_name=f"Salary_Report_{job_title}.xlsx",
+                    mime="application/vnd.ms-excel"
+                )
+
+            else:
+                st.error("לא ניתן להפיק דו״ח כרגע. ייתכן שהמפתח שגוי או שנגמרו הקרדיטים.")
