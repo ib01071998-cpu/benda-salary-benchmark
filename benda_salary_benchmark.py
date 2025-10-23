@@ -22,15 +22,6 @@ st.markdown(
         background-color: #1565C0;
         color: #fff;
     }
-    .report-container {
-        background-color: #F9FAFB;
-        padding: 25px;
-        border-radius: 12px;
-        margin-top: 20px;
-        font-size: 17px;
-        line-height: 1.9;
-        white-space: pre-wrap;
-    }
     .copy-btn {
         background-color: #42A5F5;
         color: white;
@@ -52,6 +43,7 @@ st.markdown(
 API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=API_KEY)
 
+# כותרת
 st.title("💼 מערכת ניתוח שכר ארגונית מתקדמת")
 st.markdown("הזן שם משרה בעברית ותקבל דו״ח שכר מלא הכולל טווחי שכר, מנגנוני תגמול, פירוט הטבות ושווי רכב מקובל – מותאם לחברות דומות ל־**Benda Magnetic בע״מ**.")
 
@@ -119,14 +111,16 @@ if st.button("🔍 הפק דו״ח ניתוח שכר"):
             if report:
                 st.success("✅ הדו״ח הופק בהצלחה")
 
-                # הצגת הדו"ח פעם אחת בלבד
-                st.markdown(f"<div class='report-container'>{report}</div>", unsafe_allow_html=True)
+                # ✅ מציג Markdown מעוצב תקין
+                st.markdown("### 🧾 דו״ח שכר", unsafe_allow_html=True)
+                st.markdown(report)
 
-                # כפתור העתק דו"ח (באמצעות רכיב JS)
+                # ✅ כפתור העתק דו"ח עובד
                 st.components.v1.html(
                     f"""
                     <div style="text-align:center; margin-top:15px;">
-                        <button class="copy-btn" onclick="navigator.clipboard.writeText(`{report.replace('`','').replace('"','').replace("'", '')}`); alert('✅ הדו״ח הועתק ללוח!');">
+                        <button class="copy-btn" onclick="navigator.clipboard.writeText(`{report.replace('`','').replace('"','').replace("'", '')}`);
+                        alert('✅ הדו״ח הועתק ללוח!');">
                             📋 העתק דו״ח
                         </button>
                     </div>
