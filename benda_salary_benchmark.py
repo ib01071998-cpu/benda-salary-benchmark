@@ -2,8 +2,6 @@ import streamlit as st
 from openai import OpenAI, RateLimitError, APIError, OpenAIError
 import time
 import os
-import pandas as pd
-import io
 
 # הגדרות כלליות
 st.set_page_config(page_title="מערכת שכר ארגונית חכמה", layout="centered")
@@ -31,17 +29,19 @@ st.markdown(
         margin-top: 20px;
         font-size: 17px;
         line-height: 1.9;
+        white-space: pre-wrap;
     }
-    h2 {
-        color: #1E88E5;
-        font-size: 22px;
+    .copy-btn {
+        background-color: #42A5F5;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: bold;
+        cursor: pointer;
+        border: none;
     }
-    .copy-box {
-        background-color: #EEF3FB;
-        padding: 10px;
-        border-radius: 10px;
-        margin-top: 15px;
-        text-align: center;
+    .copy-btn:hover {
+        background-color: #1E88E5;
     }
     </style>
     """,
@@ -52,7 +52,6 @@ st.markdown(
 API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=API_KEY)
 
-# כותרת
 st.title("💼 מערכת ניתוח שכר ארגונית מתקדמת")
 st.markdown("הזן שם משרה בעברית ותקבל דו״ח שכר מלא הכולל טווחי שכר, מנגנוני תגמול, פירוט הטבות ושווי רכב מקובל – מותאם לחברות דומות ל־**Benda Magnetic בע״מ**.")
 
@@ -79,7 +78,7 @@ def analyze_salary_gpt(job_title):
     • מנגנון תגמול מקובל
     • הערות / פירוט
 
-    הצג את התוצאה בעברית מקצועית וברורה.
+    הצג את התוצאה בעברית מקצועית וברורה בלבד.
     """
 
     for attempt in range(3):
@@ -108,6 +107,7 @@ def analyze_salary_gpt(job_title):
     st.error("המערכת עמוסה מדי כרגע או שהמפתח אינו תקין. נסה שוב בעוד מספר דקות.")
     return None
 
+
 # הפעלת הניתוח
 if st.button("🔍 הפק דו״ח ניתוח שכר"):
     if not job_title.strip():
@@ -115,19 +115,23 @@ if st.button("🔍 הפק דו״ח ניתוח שכר"):
     else:
         with st.spinner("מפיק דו״ח ניתוח שכר מקיף... אנא המתן..."):
             report = analyze_salary_gpt(job_title)
+
             if report:
                 st.success("✅ הדו״ח הופק בהצלחה")
+
+                # הצגת הדו"ח פעם אחת בלבד
                 st.markdown(f"<div class='report-container'>{report}</div>", unsafe_allow_html=True)
 
-                # כפתור העתק דו"ח
-                st.markdown(
+                # כפתור העתק דו"ח (באמצעות רכיב JS)
+                st.components.v1.html(
                     f"""
-                    <div class='copy-box'>
-                    <button onclick="navigator.clipboard.writeText(`{report.replace('`', '')}`)">📋 העתק דו״ח</button>
+                    <div style="text-align:center; margin-top:15px;">
+                        <button class="copy-btn" onclick="navigator.clipboard.writeText(`{report.replace('`','').replace('"','').replace("'", '')}`); alert('✅ הדו״ח הועתק ללוח!');">
+                            📋 העתק דו״ח
+                        </button>
                     </div>
                     """,
-                    unsafe_allow_html=True
+                    height=100,
                 )
-
             else:
                 st.error("לא ניתן להפיק דו״ח כרגע. ייתכן שהמפתח שגוי או שנגמרו הקרדיטים.")
