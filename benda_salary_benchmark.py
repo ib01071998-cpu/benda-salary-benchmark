@@ -6,14 +6,13 @@ from datetime import datetime
 import os
 
 # 🧠 הגדרות כלליות
-st.set_page_config(page_title="דו\"ח שכר ארגוני – צבירן אלפא PRO Default", layout="wide")
+st.set_page_config(page_title="דו\"ח שכר ארגוני – רכיבי שכר בלבד", layout="wide")
 
-# 🎨 עיצוב יוקרתי
+# 🎨 עיצוב מקצועי
 st.markdown("""
 <style>
 * { direction: rtl; text-align: right; font-family: "Heebo", sans-serif; }
 h1 { color: #0D47A1; text-align: center; font-weight: 800; margin-bottom: 10px; }
-h2, h3 { color: #1565C0; text-align: right; }
 table {
     width: 100%;
     border-collapse: collapse;
@@ -38,7 +37,6 @@ td {
     font-size: 14px;
 }
 tr:nth-child(even) td { background-color: #E8F5E9; }
-div[data-testid="stMetricValue"] { font-size: 28px !important; color: #0D47A1; }
 .copy-btn {
     background: linear-gradient(90deg, #42A5F5, #1E88E5);
     color: white;
@@ -53,56 +51,42 @@ div[data-testid="stMetricValue"] { font-size: 28px !important; color: #0D47A1; }
 </style>
 """, unsafe_allow_html=True)
 
-# 🔑 הגדרת API
+# 🔑 API
 API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=API_KEY)
 
-# 🕓 שמירת היסטוריה
-if "history" not in st.session_state:
-    st.session_state["history"] = []
-
-# 🧭 כותרת
-st.title("📊 דו\"ח שכר ארגוני חכם – מערכת 'צבירן אלפא PRO Default'")
+# 🧮 עלות מעסיק ממוצעת במשק
+def calc_employer_cost(salary):
+    return round(salary * 1.32, 2)
 
 # 📥 קלטים
 col1, col2 = st.columns([2, 1])
 with col1:
-    job_title = st.text_input("שם המשרה (לדוגמה: מנהל לוגיסטיקה, סמנכ\"ל מכירות):")
+    job_title = st.text_input("שם המשרה (לדוגמה: מנהל לוגיסטיקה, סמנכ״ל מכירות):")
 with col2:
     experience = st.number_input("שנות ניסיון (ריק = ממוצע שוק):", min_value=0, max_value=30, value=0, step=1)
 
-# 🧮 פונקציית חישוב עלות מעסיק
-def calc_employer_cost(salary):
-    """עלות מעסיק לפי ממוצע המשק (≈32%)"""
-    return round(salary * 1.32, 2)
-
 # 🧠 הפעלת GPT
 def generate_salary_table(job_title, experience):
-    # אם לא הוזן ניסיון → נשתמש בממוצע השוק
-    if experience == 0:
-        exp_text = "בהתאם לממוצע השוק ללא תלות בוותק"
-    else:
-        exp_text = f"בהתאם לעובד עם {experience} שנות ניסיון"
+    exp_text = "בהתאם לממוצע השוק" if experience == 0 else f"בהתאם לעובד עם {experience} שנות ניסיון"
 
     prompt = f"""
-    צור טבלת שכר אחת בלבד, מקצועית ומפורטת מאוד, בעברית, עבור המשרה "{job_title}" בשוק הישראלי.
+    צור טבלת שכר אחת בלבד, מקצועית ומפורטת, בעברית, עבור המשרה "{job_title}" בשוק הישראלי.
 
-    אין לכתוב שום טקסט חופשי לפני או אחרי.
-    הטבלה חייבת לכלול את העמודות הבאות:
-    | רכיב | טווח שכר (₪) | ממוצע שוק (₪) | מנגנון תגמול / תנאי | פירוט רכיב השכר | עלות מעסיק (₪) | אחוז מעלות כוללת |
+    כלול רק רכיבי שכר ותגמול ישירים בעלי ערך כספי בתלוש השכר.
+    אין לכלול כלל רכיבים לא כספיים או רכים כגון: מתנות, ימי עיון, הכשרות, ימי גיבוש, כנסים, או שעות התנדבות.
 
-    הנחיות:
-    - התייחס לנתוני שכר {exp_text}.
-    - כלול לפחות 15 רכיבים שונים: שכר בסיס, עמלות, בונוסים, סיבוס, טלפון, מחשב, ביטוחים, קרן השתלמות, הבראה, נסיעות, חניה, ביגוד, מתנות, הכשרות, רכב חברה.
-    - עבור רכב חברה פרט:
-      • שווי שימוש חודשי (₪)
-      • עלות דלק ממוצעת (₪)
-      • שווי רכב בשוק (₪)
-      • דגמים לפי דרג
-      • סוג מימון (ליסינג / בעלות)
-    - פרט מנגנוני תגמול מדויקים (למשל 3%–6% מהמכירות, 8–15K ₪ רבעוני).
-    - הוסף טווח עלות מעסיק (לדוגמה: 28,000–32,500 ₪) וחישוב כולל.
-    - מבוסס על חברות דומות ל-Benda Magnetic בע״מ (יבואנים, טכנולוגיה, מוצרי חשמל, גאדג׳טים).
+    העמודות הנדרשות:
+    | רכיב שכר | טווח שכר (₪) | ממוצע שוק (₪) | מנגנון תגמול / תנאי | פירוט רכיב השכר | עלות מעסיק (₪) | אחוז מעלות כוללת |
+
+    יש לכלול רכיבים כמו: שכר בסיס, עמלות, בונוסים, סיבוס/אש״ל, טלפון, מחשב, ביטוח בריאות, פנסיה, קרן השתלמות, נסיעות, הבראה, שעות נוספות, רכב חברה (כולל פירוט דגמים ושווי שימוש).
+    עבור רכב חברה פרט גם:
+    - שווי שימוש חודשי (₪)
+    - עלות דלק ממוצעת (₪)
+    - שווי רכב בשוק (₪)
+    - דגמים לפי דרג
+    - סוג מימון (ליסינג/בעלות)
+    כלל הנתונים מבוססים על חברות בסגנון Benda Magnetic בע״מ (יבואנים, טכנולוגיה, מוצרי חשמל, גאדג׳טים).
     """
 
     response = client.chat.completions.create(
@@ -111,7 +95,7 @@ def generate_salary_table(job_title, experience):
             {"role": "system", "content": "אתה אנליסט שכר בכיר בישראל. הפלט הוא טבלת נתונים בלבד, ללא טקסט נוסף."},
             {"role": "user", "content": prompt}
         ],
-        temperature=0.55,
+        temperature=0.5,
     )
     return response.choices[0].message.content
 
@@ -124,7 +108,7 @@ def markdown_to_df(markdown_text):
     df = df.drop(df.index[0]) if df.iloc[0].str.contains("רכיב").any() else df
     return df
 
-# 💰 חישוב עלות מעסיק כוללת
+# 💰 חישוב עלות כוללת
 def calculate_total_employer_cost(df):
     total = 0
     for val in df["עלות מעסיק (₪)"]:
@@ -138,7 +122,7 @@ def calculate_total_employer_cost(df):
             total += float(txt)
     return round(total, 2) if total > 0 else None
 
-# 🚀 הפקת דו"ח
+# 🚀 הפקת דו״ח
 if st.button("🔍 הפק דו\"ח שכר"):
     if not job_title.strip():
         st.warning("אנא הזן שם משרה.")
@@ -146,18 +130,14 @@ if st.button("🔍 הפק דו\"ח שכר"):
         with st.spinner("מפיק דו\"ח מלא... אנא המתן..."):
             report = generate_salary_table(job_title, experience)
             df = markdown_to_df(report)
-
-            # הצגת טבלה
             st.success("✅ דו\"ח הופק בהצלחה")
             st.markdown(df.to_html(escape=False, index=False), unsafe_allow_html=True)
 
-            # חישוב עלות כוללת
             total_cost = calculate_total_employer_cost(df)
             if total_cost:
                 avg_cost = calc_employer_cost(total_cost)
                 st.metric(label="💰 סה״כ עלות מעסיק משוערת לפי ממוצע המשק", value=f"{avg_cost:,.0f} ₪")
 
-            # כפתור העתקה
             st.components.v1.html(f"""
             <div style="text-align:center; margin-top:15px;">
                 <button class="copy-btn" onclick="navigator.clipboard.writeText(`{report.replace('`','').replace('"','').replace("'", '')}`);
@@ -165,8 +145,7 @@ if st.button("🔍 הפק דו\"ח שכר"):
             </div>
             """, height=100)
 
-            # שמירה להיסטוריה
-            st.session_state["history"].append({
+            st.session_state.setdefault("history", []).append({
                 "job": job_title,
                 "experience": experience,
                 "time": datetime.now().strftime("%d/%m/%Y %H:%M"),
@@ -174,7 +153,7 @@ if st.button("🔍 הפק דו\"ח שכר"):
             })
 
 # 📂 היסטוריה
-if st.session_state["history"]:
+if st.session_state.get("history"):
     st.markdown("### 🕓 היסטוריית דוחות")
     col_h1, col_h2 = st.columns([4, 1])
     with col_h2:
