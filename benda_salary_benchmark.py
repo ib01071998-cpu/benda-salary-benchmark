@@ -6,7 +6,7 @@ from datetime import datetime
 import os
 
 # 🧠 הגדרות כלליות
-st.set_page_config(page_title="דו\"ח שכר ארגוני – צבירן אלפא PRO", layout="wide")
+st.set_page_config(page_title="דו\"ח שכר ארגוני – צבירן אלפא PRO+", layout="wide")
 
 # 🎨 עיצוב יוקרתי ומדויק
 st.markdown("""
@@ -62,7 +62,7 @@ if "history" not in st.session_state:
     st.session_state["history"] = []
 
 # 🧭 כותרת
-st.title("📊 דו\"ח שכר ארגוני חכם – מערכת 'צבירן אלפא PRO'")
+st.title("📊 דו\"ח שכר ארגוני חכם – מערכת 'צבירן אלפא PRO+'")
 
 # 📥 קלטים
 col1, col2 = st.columns([2, 1])
@@ -80,7 +80,6 @@ def calc_employer_cost(salary):
 def generate_salary_table(job_title, experience):
     prompt = f"""
     צור טבלת שכר אחת בלבד, מקצועית ומפורטת מאוד, בעברית, עבור המשרה "{job_title}" בשוק הישראלי.
-
     אין לכתוב שום טקסט חופשי לפני או אחרי.
     הטבלה חייבת לכלול את העמודות הבאות:
     | רכיב | טווח שכר (₪) | ממוצע שוק (₪) | מנגנון תגמול / תנאי | פירוט רכיב השכר | עלות מעסיק (₪) | אחוז מעלות כוללת |
@@ -109,7 +108,7 @@ def generate_salary_table(job_title, experience):
     )
     return response.choices[0].message.content
 
-# המרה לטבלה
+# 🧾 המרת Markdown ל-DataFrame
 def markdown_to_df(markdown_text):
     lines = [line.strip() for line in markdown_text.splitlines() if "|" in line]
     clean = [line for line in lines if not line.startswith("|-")]
@@ -118,7 +117,7 @@ def markdown_to_df(markdown_text):
     df = df.drop(df.index[0]) if df.iloc[0].str.contains("רכיב").any() else df
     return df
 
-# חישוב עלות כוללת
+# 💰 חישוב עלות מעסיק כוללת
 def calculate_total_employer_cost(df):
     total = 0
     for val in df["עלות מעסיק (₪)"]:
@@ -159,7 +158,7 @@ if st.button("🔍 הפק דו\"ח שכר"):
             </div>
             """, height=100)
 
-            # היסטוריה
+            # שמירה להיסטוריה
             st.session_state["history"].append({
                 "job": job_title,
                 "experience": experience,
@@ -167,9 +166,20 @@ if st.button("🔍 הפק דו\"ח שכר"):
                 "report": report
             })
 
-# 📂 היסטוריה
+# 📂 ניהול היסטוריה
 if st.session_state["history"]:
     st.markdown("### 🕓 היסטוריית דוחות")
+    col_h1, col_h2 = st.columns([4, 1])
+    with col_h2:
+        if st.button("🧹 נקה היסטוריה"):
+            st.session_state["history"] = []
+            st.success("היסטוריה נוקתה בהצלחה ✅")
+            st.stop()
+
     for item in reversed(st.session_state["history"]):
-        with st.expander(f"{item['job']} – {item['experience']} שנות ניסיון — {item['time']}"):
-            st.markdown(item["report"])
+        job = item.get("job", "לא צויין")
+        exp = item.get("experience", 0)
+        time = item.get("time", "לא ידוע")
+        report = item.get("report", "אין מידע להצגה")
+        with st.expander(f"{job} – {exp} שנות ניסיון — {time}"):
+            st.markdown(report)
