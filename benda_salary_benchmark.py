@@ -31,7 +31,7 @@ def analyze_salary_gpt(job_title):
     """
 
     response = client.chat.completions.create(
-        model="gpt-5",
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": "אתה אנליסט שכר בכיר לשוק העבודה הישראלי."},
             {"role": "user", "content": prompt}
@@ -98,3 +98,4 @@ if st.button("נתח שכר"):
 
             with open("דו\"ח_שכר.pdf", "rb") as f:
                 st.download_button("📄 הורד דו״ח PDF", f, file_name=f"דוח_שכר_{job_title}.pdf")
+
