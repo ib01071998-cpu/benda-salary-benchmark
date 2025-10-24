@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 # ----------------------------------------------
 # הגדרות כלליות
 # ----------------------------------------------
-st.set_page_config(page_title="MASTER 4.3 – מערכת בנצ׳מארק חכמה", layout="wide")
+st.set_page_config(page_title="MASTER 4.3.1 – מערכת בנצ׳מארק חכמה", layout="wide")
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 SERPER_KEY = os.getenv("SERPER_API_KEY")
@@ -30,7 +30,6 @@ table{width:100%; border-collapse:collapse; border-radius:12px; overflow:hidden;
 th{background:#1565C0;color:#fff;padding:12px; font-weight:800; border:1px solid #E3F2FD; text-align:center}
 td{background:#fff;border:1px solid #E3F2FD;padding:10px;text-align:center}
 tr:nth-child(even) td{background:#F1F8E9}
-.summary-card{background:#E3F2FD; padding:16px; border-radius:10px; text-align:center; margin-top:14px}
 .copy-btn{background:linear-gradient(90deg,#1E88E5,#42A5F5); color:#fff; padding:10px 26px; border:none; border-radius:10px; font-weight:700; cursor:pointer}
 </style>
 """, unsafe_allow_html=True)
@@ -39,7 +38,7 @@ tr:nth-child(even) td{background:#F1F8E9}
 # פונקציות עזר
 # ----------------------------------------------
 def get_live_data(job_title: str) -> str:
-    """שליפת מידע ממקורות שכר בישראל (AllJobs, Drushim, Globes וכו׳)"""
+    """שליפת מידע ממקורות שכר בישראל"""
     if not SERPER_KEY:
         return "⚠️ אין מפתח SERPER — הפלט מבוסס רק על GPT."
     url = "https://google.serper.dev/search"
@@ -53,14 +52,14 @@ def get_live_data(job_title: str) -> str:
         return f"שגיאה: {e}"
 
 def generate_salary_table(job_title, experience, live_data):
-    """מפיק טבלת שכר אינפורמטיבית ומפורטת"""
+    """מפיק טבלת שכר אינפורמטיבית ומפורטת בלבד"""
     exp_text = "בהתאם לממוצע השוק" if experience==0 else f"עבור {experience} שנות ניסיון"
     prompt = f"""
 להלן מידע חי ממקורות ישראליים עבור "{job_title}":
 {live_data}
 
 צור טבלת בנצ׳מארק שכר מפורטת (2025) בעברית מלאה, הכוללת:
-- כל רכיבי השכר האפשריים: שכר בסיס, עמלות, בונוסים, מענקים, אחזקת רכב, אש"ל, שעות נוספות, קרן השתלמות, פנסיה, ביטוחים, ימי הבראה, ציוד, דלק, טלפון, חניה, וכו׳.
+- כל רכיבי השכר האפשריים: שכר בסיס, עמלות, בונוסים, מענקים, אחזקת רכב, אש"ל, שעות נוספות, קרן השתלמות, פנסיה, ביטוחים, ימי הבראה, ציוד, דלק, טלפון, חניה וכו׳.
 - עבור רכיבי שכר משתנים, פרט מנגנוני תגמול מלאים כולל:
   * שיעור תגמול (באחוזים)
   * מדרגות תגמול (לדוג׳: 3% עד יעד, 5% מעל יעד)
@@ -74,7 +73,8 @@ def generate_salary_table(job_title, experience, live_data):
   * סוג מימון (ליסינג/בעלות)
   * האם כולל דלק וביטוחים
 
-הצג טבלה בלבד, עם העמודות הבאות:
+הצג אך ורק טבלה, ללא טקסט נוסף.
+העמודות:
 | רכיב שכר | טווח שכר (₪) | ממוצע שוק (₪) | מנגנון תגמול מפורט | אחוז חברות שמציעות | מגמת שוק | עלות מעסיק (₪) | אחוז מעלות כוללת |
 """
     r = client.chat.completions.create(
@@ -87,53 +87,11 @@ def generate_salary_table(job_title, experience, live_data):
     )
     return r.choices[0].message.content
 
-def md_to_df(md: str) -> pd.DataFrame:
-    """ממיר טבלת Markdown ל־DataFrame"""
-    lines = [ln for ln in md.splitlines() if "|" in ln and not set(ln.strip()) <= {"|","-"}]
-    csv_text = "\n".join(lines)
-    df = pd.read_csv(StringIO(csv_text), sep="|").dropna(axis=1, how="all")
-    df = df.rename(columns=lambda x: x.strip())
-    if "" in df.columns: df = df.drop(columns=[""])
-    if len(df)>0 and "רכיב" in str(df.iloc[0,0]): df = df.iloc[1:].reset_index(drop=True)
-    return df
-
-def extract_base_salary(df):
-    """מחלץ שכר בסיס מתוך הטבלה"""
-    try:
-        base_row = df[df["רכיב שכר"].str.contains("בסיס|שכר חודשי|fixed", case=False, na=False)]
-        if base_row.empty: return None
-        values = re.findall(r"\d{3,6}", str(base_row.iloc[0].to_string()))
-        return int(sum(map(int, values))/len(values)) if values else None
-    except Exception:
-        return None
-
-def calc_total_cost(df, base_salary):
-    """חישוב כולל של ברוטו ועלות מעסיק לפי רכיבי שכר"""
-    if not base_salary:
-        return None, None
-
-    # נשלוף תוספות משמעותיות (עמלות, בונוסים, רכב)
-    text = " ".join(df["רכיב שכר"].astype(str))
-    bonus_rows = df[df["רכיב שכר"].str.contains("עמלה|בונוס|מענק", case=False, na=False)]
-    car_rows = df[df["רכיב שכר"].str.contains("רכב|הטבות רכב", case=False, na=False)]
-
-    add_bonus = 0
-    for v in bonus_rows["ממוצע שוק (₪)"].astype(str):
-        nums = re.findall(r"\d{3,6}", v)
-        if nums: add_bonus += sum(map(int, nums))/len(nums)
-    for v in car_rows["ממוצע שוק (₪)"].astype(str):
-        nums = re.findall(r"\d{3,6}", v)
-        if nums: add_bonus += sum(map(int, nums))/len(nums)
-
-    gross = base_salary + add_bonus
-    employer_cost = round(gross * 1.31, 0)
-    return gross, employer_cost
-
 # ----------------------------------------------
 # ממשק ראשי
 # ----------------------------------------------
-st.title("💼 MASTER 4.3 – מערכת בנצ׳מארק כוללת")
-st.caption("GPT-4 Turbo + Serper + חישוב ריאלי לפי רכיבים")
+st.title("💼 MASTER 4.3.1 – מערכת בנצ׳מארק כוללת")
+st.caption("GPT-4 Turbo + Serper | כל רכיבי השכר | מנגנוני תגמול מפורטים | ללא חישוב ברוטו/עלות מעסיק")
 
 col1, col2 = st.columns([2,1])
 with col1:
@@ -161,27 +119,12 @@ if run:
             st.markdown(live)
         with st.spinner("מפיק דו״ח..."):
             md = generate_salary_table(job, exp, live)
-        st.markdown("### 📊 טבלת רכיבי שכר:")
+        st.markdown("### 📊 טבלת רכיבי שכר מלאה:")
         st.markdown(md, unsafe_allow_html=True)
 
-        try:
-            df = md_to_df(md)
-            base = extract_base_salary(df)
-            gross, cost = calc_total_cost(df, base)
-            if gross and cost:
-                st.markdown(f"""
-                <div class="summary-card">
-                💰 <b>חישוב לפי ממוצע שוק</b><br>
-                שכר בסיס משוער: <b>{base:,.0f} ₪</b><br>
-                שכר ברוטו ממוצע (כולל עמלות/בונוסים/רכב): <b>{gross:,.0f} ₪</b><br>
-                עלות מעסיק כוללת (פנסיה, קרן השתלמות, ביטוח לאומי, רכב): <b>{cost:,.0f} ₪</b>
-                </div>
-                """, unsafe_allow_html=True)
-        except Exception as e:
-            st.error(f"שגיאה בעיבוד: {e}")
-
         st.session_state["history"].append({
-            "job": job, "exp": exp,
+            "job": job,
+            "exp": exp,
             "time": datetime.now().strftime("%d/%m/%Y %H:%M"),
             "report": md
         })
@@ -196,7 +139,7 @@ if run:
 if st.session_state["history"]:
     st.markdown("### 🕓 היסטוריית דוחות")
     for item in reversed(st.session_state["history"]):
-        exp_value = item.get("exp") or item.get("experience") or 0
+        exp_value = item.get("exp") or 0
         exp_label = "ממוצע שוק" if exp_value == 0 else f"{exp_value} שנות ניסיון"
         with st.expander(f"{item.get('job','לא צויין')} — {exp_label} — {item.get('time','לא ידוע')}"):
             st.markdown(item.get("report","אין דו\"ח להצגה"))
