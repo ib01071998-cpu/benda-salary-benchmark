@@ -8,7 +8,7 @@ import pandas as pd
 # -------------------------------------------------
 # הגדרות מערכת
 # -------------------------------------------------
-st.set_page_config(page_title="מערכת בנצ'מארק שכר – גרסת פרימיום ישראלית", layout="wide")
+st.set_page_config(page_title="מערכת בנצ'מארק שכר – גרסת Ultimate ישראלית", layout="wide")
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 SERPER_KEY = os.getenv("SERPER_API_KEY")
@@ -20,15 +20,11 @@ st.markdown("""
 <style>
 * { direction: rtl; text-align: right; font-family: "Heebo", sans-serif; }
 h1 { color:#0D47A1; text-align:center; font-weight:900; margin-bottom:6px; }
-h2 { color:#1565C0; font-weight:800; margin-top:20px; }
-table {width:100%; border-collapse:collapse; border-radius:12px; overflow:hidden; box-shadow:0 3px 12px rgba(0,0,0,0.1)}
-th {background:#1976D2;color:#fff;padding:12px; font-weight:700; border:1px solid #E3F2FD; text-align:center}
-td {background:#fff;border:1px solid #E3F2FD;padding:10px;text-align:center;font-size:15px}
-tr:nth-child(even) td {background:#F9FBE7}
-.copy-btn{background:linear-gradient(90deg,#1E88E5,#42A5F5); color:#fff; padding:10px 26px; border:none; border-radius:10px; font-weight:700; cursor:pointer}
-.summary-box {background:#E3F2FD; padding:22px; border-radius:12px; text-align:center; margin-top:30px; box-shadow:inset 0 0 8px rgba(0,0,0,0.1);}
-.summary-line {font-size:18px; font-weight:600; color:#0D47A1;}
-.summary-value {font-size:22px; font-weight:800; color:#1E88E5;}
+table {width:100%; border-collapse:collapse; border-radius:12px; overflow:hidden; box-shadow:0 3px 12px rgba(0,0,0,0.1);}
+th {background:#1565C0;color:#fff;padding:10px; font-weight:700; text-align:center;}
+td {border:1px solid #E3F2FD;padding:10px;text-align:center;font-size:15px;}
+tr:nth-child(even) td {background:#F9FBE7;}
+.copy-btn{background:linear-gradient(90deg,#1E88E5,#42A5F5); color:#fff; padding:10px 26px; border:none; border-radius:10px; font-weight:700; cursor:pointer;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -77,35 +73,34 @@ def generate_salary_table(job_title, experience, df):
     prompt = f"""
 {live_summary}
 
-צור טבלת בנצ'מארק שכר מדויקת ומלאה לתפקיד "{job_title}" בישראל {exp_text} לשנת 2025.
-שלב בין נתוני אמת ממקורות ישראליים לבין ידע עדכני בשוק המקומי.
+צור טבלת בנצ'מארק שכר מקצועית ומדויקת לתפקיד "{job_title}" בישראל {exp_text} לשנת 2025.
 
-הצג את כלל רכיבי השכר הרלוונטיים:
-שכר בסיס, עמלות, בונוסים, מענקים, אחזקת רכב (כולל שווי שוק ודגמים), שעות נוספות, קרן השתלמות, פנסיה, ביטוחים, אש"ל, ימי הבראה, ציוד, טלפון נייד, דלק, חניה, חופשות, מתנות/ביגוד/רווחה.
+הטבלה צריכה להיות בפורמט אחיד וברור:
+| רכיב שכר | טווח שכר | בסיסית | בינונית | גבוהה | ממוצע שוק (₪) | מנגנון תגמול מפורט | עלות מעסיק ממוצעת (₪) | אחוז מעלות כוללת (%) |
 
-אם יש רכיבים נוספים רלוונטיים לפי סוג המשרה (לדוג׳: כוננויות, אופציות, הוצאות, הטבות רווחה), הוסף אותם.
+⚙️ כללים מרכזיים:
+- הצג טווחים מדויקים וריאליים (לא ערכים עגולים מדי).
+- עבור רכיבים משתנים (עמלות, בונוסים וכו’) הצג אחוזים (%), עבור קבועים – בש"ח.
+- שלוש רמות תגמול (בסיסית, בינונית, גבוהה) חובה לכל רכיב.
+- הצג **רק טבלה אחת בלבד**, ללא הסברים או מלל חיצוני.
 
-לכל רכיב:
-- הצג טווח מדויק (מינימום–מקסימום) לפי סוג הרכיב:
-  • רכיבים כספיים (שכר, בונוס, סיבוס וכו׳) – טווח ₪
-  • רכיבים משתנים (עמלות, יעדים, אחוז הצלחה) – טווח אחוזים %
-  • רכיבי פנסיה/קרנות – אחוז מהשכר (%)
-  • רכב – שווי שוק ₪ + זקיפת שווי ₪
-  • אופציות – אחוז מהמניות או ערך ₪ שנתי
-- הצג ממוצע שוק
-- הצג שלוש רמות תגמול (בסיסית, בינונית, גבוהה)
-- הצג מנגנון תגמול מפורט (נוסחה, מדרגות, תקרה, תדירות, דוגמה)
-- הצג עלות מעסיק ממוצעת (₪)
-- הצג אחוז מעלות השכר הכוללת (%)
+📊 רכיבי שכר חובה:
+שכר בסיס, עמלות, בונוסים, רכב חברה (כולל שווי שוק וזקיפת שווי בלבד), קרן השתלמות, פנסיה, ביטוחים, אש"ל, ימי הבראה, ציוד, טלפון נייד, דלק, חופשות, מתנות/רווחה, אופציות (אם רלוונטי).
 
-⚠️ הנחיות מיוחדות:
-- שמור על טווחים ריאליים עם יחס מקובל של 1.2–1.5 בין מינימום למקסימום.
-- הצג ערכים מספריים מדויקים (לא עגולים מדי).
-- ברכיב רכב הצג גם שלושה דגמים מקובלים ושווי השוק שלהם.
-- בעמודת עלות המעסיק של רכיב רכב הצג את **זקיפת השווי לעובד** (≈ 3,000 ₪ לחודש).
+🧮 הנחיות למנגנוני תגמול מפורטים (בעמודת “מנגנון תגמול מפורט”):
+- **עמלות:** 3%–7% מהמכירות, מדרגות: 3% עד 100K ₪, 5% עד 200K ₪, 7% מעל.
+- **בונוסים:** חודשיים/שנתיים לפי עמידה ביעדים או KPI; לדוגמה 10,000 ₪ תקרה.
+- **רכב חברה:** הצג שווי שוק (150K–220K ₪), ודגמים כגון סקודה סופרב / טויוטה קורולה / מאזדה 6; זקיפת שווי 3,000 ₪.
+- **קרן השתלמות:** 7.5% מעסיק, 2.5% עובד.
+- **פנסיה:** 6.5% מעסיק, 6% עובד, 8.33% פיצויים.
+- **אש"ל:** 700–1,200 ₪.
+- **טלפון נייד:** השתתפות 150–300 ₪.
+- **דלק:** 2.1–2.4 ₪ לק"מ.
+- **רווחה / שי:** 1,000–1,500 ₪ לשנה.
+- **אופציות:** 0.05%–0.3% מהמניות או 30–80K ₪ לשנה.
 
-בסוף הדוח הוסף שורה מסכמת:
-סה״כ עלות מעסיק כוללת (₪) לפי ממוצעי השוק.
+בסוף הטבלה הוסף שורה מסכמת:
+סה״כ עלות מעסיק כוללת לפי ממוצעי השוק (₪).
 """
 
     r = client.chat.completions.create(
