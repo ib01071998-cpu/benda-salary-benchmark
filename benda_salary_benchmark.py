@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 # -------------------------------------------------
 # הגדרות כלליות
 # -------------------------------------------------
-st.set_page_config(page_title="MASTER 4.6 – Real Market Benchmark", layout="wide")
+st.set_page_config(page_title="מערכת בנצ'מארק שכר – שוק העבודה בישראל", layout="wide")
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 SERPER_KEY = os.getenv("SERPER_API_KEY")
@@ -20,23 +20,24 @@ st.markdown("""
 <style>
 * { direction: rtl; text-align: right; font-family: "Heebo", sans-serif; }
 h1 { color:#0D47A1; text-align:center; font-weight:900; margin-bottom:6px; }
+h2 { color:#1565C0; font-weight:800; border-bottom:2px solid #BBDEFB; padding-bottom:4px; }
 table{width:100%; border-collapse:collapse; border-radius:10px; overflow:hidden; box-shadow:0 3px 10px rgba(0,0,0,.08)}
-th{background:#1565C0;color:#fff;padding:12px; font-weight:800; border:1px solid #E3F2FD; text-align:center}
-td{background:#fff;border:1px solid #E3F2FD;padding:10px;text-align:center}
+th{background:#1976D2;color:#fff;padding:12px; font-weight:800; border:1px solid #E3F2FD; text-align:center}
+td{background:#fff;border:1px solid #E3F2FD;padding:10px;text-align:center;font-size:15px}
 tr:nth-child(even) td{background:#F1F8E9}
 .copy-btn{background:linear-gradient(90deg,#1E88E5,#42A5F5); color:#fff; padding:10px 26px; border:none; border-radius:10px; font-weight:700; cursor:pointer}
 .stButton>button {
   background: linear-gradient(90deg,#1976D2,#42A5F5); color:#fff; border:none; border-radius:10px;
   font-weight:700; padding:10px 20px; box-shadow:0 2px 10px rgba(0,0,0,.15);
 }
+div[data-testid="stExpander"] { border:1px solid #BBDEFB; border-radius:8px; background:#FAFAFA; }
 </style>
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------
-# שליפת נתונים אמיתיים ממקורות ישראליים
+# שליפת נתוני אמת ממקורות ישראליים בלבד
 # -------------------------------------------------
 def get_live_salary_data(job_title: str) -> pd.DataFrame:
-    """שולף נתוני שכר ממספר אתרים ישראליים אמיתיים"""
     url = "https://google.serper.dev/search"
     headers = {"X-API-KEY": SERPER_KEY}
     sources = [
@@ -44,7 +45,8 @@ def get_live_salary_data(job_title: str) -> pd.DataFrame:
         "site:drushim.co.il",
         "site:globes.co.il",
         "site:bizportal.co.il",
-        "site:indeed.com/q-israel"
+        "site:maariv.co.il",
+        "site:ynet.co.il"
     ]
     rows = []
     for src in sources:
@@ -58,58 +60,77 @@ def get_live_salary_data(job_title: str) -> pd.DataFrame:
                 salaries = [int(x.replace(",", "")) for x in nums]
                 if salaries:
                     rows.append({
-                        "source": src.split(":")[1].split(".")[0].capitalize(),
-                        "min": min(salaries),
-                        "max": max(salaries),
-                        "avg": sum(salaries) / len(salaries)
+                        "מקור": src.split(":")[1].split(".")[0].capitalize(),
+                        "שכר מינימום": min(salaries),
+                        "שכר מקסימום": max(salaries),
+                        "שכר ממוצע": sum(salaries)/len(salaries)
                     })
         except Exception:
             continue
     return pd.DataFrame(rows)
 
 # -------------------------------------------------
-# יצירת טבלת בנצ'מארק רחבה ומפורטת
+# בנצ'מארק חכם מבוסס GPT ונתוני אמת
 # -------------------------------------------------
 def generate_salary_table(job_title, experience, df):
-    """יוצר טבלת בנצ’מארק מלאה ומבוססת נתוני אמת + השלמות GPT"""
-    avg_market = int(df["avg"].mean()) if not df.empty else None
-    live_summary = f"נתוני אמת ממקורות שוק בישראל:\n{df.to_string(index=False)}" if not df.empty else "לא נמצאו נתוני אמת, הפלט יתבסס על GPT בלבד."
+    avg_market = int(df["שכר ממוצע"].mean()) if not df.empty else None
+    live_summary = f"נתוני אמת שנשלפו ממקורות שוק בישראל:\n{df.to_string(index=False)}" if not df.empty else "לא נמצאו נתוני אמת – יוצג בנצ'מארק GPT בלבד."
     exp_text = "בהתאם לממוצע השוק" if experience==0 else f"עבור {experience} שנות ניסיון"
 
     prompt = f"""
 {live_summary}
 
-צור טבלת בנצ׳מארק מקיפה לתפקיד "{job_title}" בישראל {exp_text} לשנת 2025.
-התבסס על הנתונים למעלה, ובנה טבלה הכוללת את כלל רכיבי השכר הקיימים במשק.
+צור טבלת בנצ'מארק שכר מלאה לתפקיד "{job_title}" בישראל {exp_text} לשנת 2025.
+התבסס על נתוני אמת משוק העבודה הישראלי (AllJobs, Drushim, Globes, Bizportal, Ynet, Maariv)
+והצג טבלה אינפורמטיבית מלאה ומפורטת בלבד – ללא מלל נוסף.
 
 יש לכלול:
-- שכר בסיס, עמלות, בונוסים, מענקים, אחזקת רכב, שעות נוספות, אש"ל, קרן השתלמות, פנסיה, ביטוחים, ימי הבראה, ציוד, חניה, טלפון נייד, דלק, ביגוד, חופשות.
-- עבור כל רכיב ציין:
-  * טווח שכר (₪)
-  * ממוצע שוק (₪)
-  * מנגנון תגמול מפורט ומבוסס (לדוג׳: 5% מהמכירות עד תקרה של 8,000 ₪)
-  * אחוז חברות שמציעות את הרכיב
-  * מגמת שוק (עולה / יציב / בירידה)
-  * עלות מעסיק משוערת (₪)
-  * אחוז מכלל עלות השכר הכוללת
+- שכר בסיס
+- עמלות
+- בונוסים
+- מענקים
+- אחזקת רכב (כולל שווי שוק ודגמים)
+- שעות נוספות
+- קרן השתלמות
+- פנסיה
+- ביטוחים
+- אש"ל
+- ימי הבראה
+- ציוד
+- טלפון נייד
+- דלק
+- חניה
+- חופשות
+- מתנות / ביגוד / רווחה
 
-הצג את הנתונים בצורה של טבלה מקצועית בלבד, ללא טקסט נוסף.
+לכל רכיב ציין:
+* טווח שכר (₪)
+* ממוצע שוק (₪)
+* מנגנון תגמול מפורט ומבוסס שוק (לדוג׳: 5% מהמכירות עד תקרה של 8,000 ₪, או בונוס שנתי 2 משכורות)
+* אחוז חברות שמציעות את הרכיב
+* מגמת שוק (עולה / יציב / בירידה)
+* עלות מעסיק ממוצעת (₪)
+* אחוז מכלל עלות השכר הכוללת
+
+בסוף הוסף שורת סיכום הכוללת:
+- שכר ברוטו ממוצע כולל
+- עלות מעסיק כוללת ממוצעת (בהתאם ליחס ממוצע של 1.35 משכר הברוטו)
 """
     r = client.chat.completions.create(
         model="gpt-4-turbo",
         messages=[
-            {"role":"system","content":"אתה אנליסט שכר בכיר בישראל. הפלט תמיד טבלה בלבד בעברית."},
+            {"role":"system","content":"אתה אנליסט שכר בכיר בישראל. הפלט תמיד טבלה בלבד בעברית, ללא טקסט נוסף."},
             {"role":"user","content":prompt}
         ],
-        temperature=0.2,
+        temperature=0.25,
     )
     return r.choices[0].message.content, avg_market
 
 # -------------------------------------------------
-# ממשק משתמש
+# ממשק המשתמש
 # -------------------------------------------------
-st.title("💼 MASTER 4.6 – Real Market Benchmark")
-st.caption("GPT-4 Turbo + SERPER API | בנצ׳מארק אמיתי ורחב על סמך מקורות שוק ישראליים")
+st.title("💼 מערכת בנצ'מארק שכר – שוק העבודה בישראל")
+st.caption("מבוסס על GPT-4 Turbo + SERPER API | מקורות: AllJobs, Drushim, Globes, Bizportal, Maariv, Ynet")
 
 col1, col2 = st.columns([2,1])
 with col1:
@@ -131,16 +152,18 @@ if run:
     if not job.strip():
         st.warning("אנא הזן שם משרה.")
     else:
-        with st.spinner("📡 שואב נתונים ממקורות אמת בישראל..."):
+        with st.spinner("📡 שולף נתונים אמיתיים ממקורות ישראליים..."):
             live_df = get_live_salary_data(job)
+
         st.markdown("### 🌐 נתוני אמת מהשוק:")
         if not live_df.empty:
             st.dataframe(live_df, hide_index=True, use_container_width=True)
         else:
-            st.info("לא נמצאו נתונים אמיתיים, מוצג ממוצע GPT בלבד.")
+            st.info("לא נמצאו נתונים אמיתיים, יוצג חישוב ממוצע משוק העבודה הכללי.")
 
-        with st.spinner("מפיק טבלת בנצ׳מארק אמינה ומפורטת..."):
+        with st.spinner("מחשב בנצ'מארק חכם ומפיק טבלת שכר מלאה..."):
             md, avg = generate_salary_table(job, exp, live_df)
+
         st.markdown("### 📊 טבלת רכיבי שכר מלאה:")
         st.markdown(md, unsafe_allow_html=True)
 
@@ -156,7 +179,7 @@ if run:
         </div>
         """, height=80)
 
-# היסטוריה
+# היסטוריית דוחות
 if st.session_state["history"]:
     st.markdown("### 🕓 היסטוריית דוחות")
     for item in reversed(st.session_state["history"]):
