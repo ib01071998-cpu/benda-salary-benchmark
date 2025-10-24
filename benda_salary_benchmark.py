@@ -14,37 +14,36 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 SERPER_KEY = os.getenv("SERPER_API_KEY")
 
 # -------------------------------------------------
-# עיצוב פרימיום
+# עיצוב חדש – רמה בינלאומית
 # -------------------------------------------------
 st.markdown("""
 <style>
 * { direction: rtl; text-align: right; font-family: "Heebo", sans-serif; }
 h1 { color:#0D47A1; text-align:center; font-weight:900; margin-bottom:6px; }
 h2 { color:#1565C0; font-weight:800; margin-top:20px; }
-table {width:100%; border-collapse:collapse; border-radius:12px; overflow:hidden; box-shadow:0 3px 12px rgba(0,0,0,0.1)}
-th {background:#1976D2;color:#fff;padding:12px; font-weight:700; border:1px solid #E3F2FD; text-align:center}
-td {background:#fff;border:1px solid #E3F2FD;padding:10px;text-align:center;font-size:15px}
-tr:nth-child(even) td {background:#F9FBE7}
+.dataframe {width:100%; border-collapse:collapse; border-radius:12px; overflow:hidden; box-shadow:0 3px 12px rgba(0,0,0,0.08)}
+.dataframe th {background:#1976D2;color:#fff;padding:12px;font-weight:700;border:1px solid #E3F2FD;text-align:center}
+.dataframe td {background:#fff;border:1px solid #E3F2FD;padding:10px;text-align:center;font-size:15px}
+.dataframe tr:nth-child(even) td {background:#F1F8E9}
 .copy-btn{background:linear-gradient(90deg,#1E88E5,#42A5F5); color:#fff; padding:10px 26px; border:none; border-radius:10px; font-weight:700; cursor:pointer}
 .summary-box {background:#E3F2FD; padding:22px; border-radius:12px; text-align:center; margin-top:30px; box-shadow:inset 0 0 8px rgba(0,0,0,0.1);}
 .summary-line {font-size:18px; font-weight:600; color:#0D47A1;}
 .summary-value {font-size:22px; font-weight:800; color:#1E88E5;}
+table {width:100%; border-collapse:collapse; border-radius:10px; overflow:hidden;}
+td, th {padding:8px; border:1px solid #ccc;}
+tr:nth-child(even){background:#FAFAFA;}
 </style>
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------
-# שליפת נתוני אמת ממקורות ישראליים
+# שליפת נתוני אמת
 # -------------------------------------------------
 def get_live_salary_data(job_title: str):
     url = "https://google.serper.dev/search"
     headers = {"X-API-KEY": SERPER_KEY}
     sources = [
-        "site:alljobs.co.il",
-        "site:drushim.co.il",
-        "site:globes.co.il",
-        "site:bizportal.co.il",
-        "site:maariv.co.il",
-        "site:ynet.co.il"
+        "site:alljobs.co.il", "site:drushim.co.il", "site:globes.co.il",
+        "site:bizportal.co.il", "site:maariv.co.il", "site:ynet.co.il"
     ]
     rows = []
     for src in sources:
@@ -68,7 +67,7 @@ def get_live_salary_data(job_title: str):
     return pd.DataFrame(rows)
 
 # -------------------------------------------------
-# הפקת טבלת בנצ'מארק משולבת GPT + נתוני אמת
+# הפקת טבלת בנצ'מארק
 # -------------------------------------------------
 def generate_salary_table(job_title, experience, df):
     exp_text = "בהתאם לממוצע השוק" if experience == 0 else f"עבור {experience} שנות ניסיון"
@@ -78,37 +77,36 @@ def generate_salary_table(job_title, experience, df):
 {live_summary}
 
 צור טבלת בנצ'מארק שכר מקצועית לתפקיד "{job_title}" בישראל {exp_text} לשנת 2025.
-שלב בין נתוני השוק האמיתיים למידע המעודכן המקובל בישראל.
+יש להציג טבלה בפורמט HTML בלבד – לא Markdown!
 
-יש לכלול את כלל רכיבי השכר הרלוונטיים:
-שכר בסיס, עמלות, בונוסים, מענקים, אחזקת רכב (כולל זקיפת שווי במשכורת), שעות נוספות, קרן השתלמות, פנסיה, ביטוחים, אש"ל, ימי הבראה, ציוד, טלפון נייד, דלק, חניה, חופשות, מתנות/ביגוד/רווחה.
+יש לכלול את כלל רכיבי השכר:
+שכר בסיס, עמלות, בונוסים, מענקים, אחזקת רכב (כולל זקיפת שווי במשכורת), שעות נוספות, קרן השתלמות, פנסיה, ביטוחים, אש"ל, ימי הבראה, ציוד, טלפון נייד, דלק, חניה, חופשות, רווחה.
 
-לכל רכיב חובה לכלול:
-- טווחים ברורים (שכר, אחוזים או סכומים – לדוגמה 8,000–12,000 ₪ או 3%–6%)
+לכל רכיב הצג:
+- טווחים ברורים (₪ או %)
 - שלוש רמות תגמול בעמודות (בסיסית, בינונית, גבוהה)
 - ממוצע שוק (₪)
-- מנגנון תגמול מפורט בהתאם לנורמות השוק בישראל (לדוגמה: עמלות מכירה של 5% מהמכירות נטו עד תקרה של 8,000 ₪)
+- מנגנון תגמול מקובל בישראל בפועל
 - עלות מעסיק ממוצעת (₪)
-- אחוז מעלות השכר הכוללת (%)
+- אחוז מעלות כוללת (%)
 
-בסעיף "רכב חברה":
-- הצג את **זקיפת שווי הרכב** לשכר החודשי (₪) – לדוגמה 2,800–3,500 ₪ בהתאם לשווי הרכב.
-- ציין שלושה דגמים תואמים לרמת תפקיד זו (לדוג׳: סקודה סופרב, טויוטה קאמרי, מאזדה 6).
+ברכיב "רכב חברה":
+- הצג את זקיפת השווי למשכורת החודשית (₪)
+- ציין 3 דגמים תואמים (למשל סקודה סופרב, טויוטה קאמרי, מאזדה 6)
 
-בסוף הדוח הצג **תיבת סיכום מעוצבת וברורה** הכוללת:
-- עלות מעסיק כוללת משוערת (שכר × 1.35 + עלויות נלוות)
+בסוף הדוח הצג תיבת סיכום מעוצבת עם:
+- עלות מעסיק כוללת (שכר × 1.35 + עלויות נלוות)
 - הערכת שווי כוללת של ההטבות (₪)
 """
     r = client.chat.completions.create(
         model="gpt-4-turbo",
         messages=[
-            {"role": "system", "content": "אתה אנליסט שכר בכיר בישראל. הפלט שלך הוא טבלה אחת בלבד בעברית, ללא טקסט נוסף."},
+            {"role": "system", "content": "אתה אנליסט שכר בכיר בישראל. הפלט הוא HTML בלבד, כולל טבלה מעוצבת מלאה."},
             {"role": "user", "content": prompt}
         ],
         temperature=0.25,
     )
     return r.choices[0].message.content
-
 
 # -------------------------------------------------
 # ממשק המשתמש
@@ -136,14 +134,13 @@ if run:
     if not job.strip():
         st.warning("אנא הזן שם משרה.")
     else:
-        with st.spinner("📡 שולף נתונים ממקורות ישראליים (AllJobs, Drushim, Globes, Bizportal)..."):
+        with st.spinner("📡 שולף נתונים ממקורות ישראליים..."):
             df = get_live_salary_data(job)
-
-        with st.spinner("🧠 מחשב בנצ'מארק חכם ומפיק טבלת שכר מלאה..."):
-            md = generate_salary_table(job, exp, df)
+        with st.spinner("🧠 מחשב בנצ'מארק ומעצב דוח..."):
+            html = generate_salary_table(job, exp, df)
 
         st.markdown("### 📊 טבלת רכיבי שכר מלאה:")
-        st.markdown(md, unsafe_allow_html=True)
+        st.components.v1.html(html, height=1000, scrolling=True)
 
         st.markdown("""
         <div class="summary-box">
@@ -155,12 +152,12 @@ if run:
         st.session_state["history"].append({
             "job": job, "exp": exp,
             "time": datetime.now().strftime("%d/%m/%Y %H:%M"),
-            "report": md
+            "report": html
         })
 
         st.components.v1.html(f"""
         <div style="text-align:center; margin-top:10px;">
-          <button class="copy-btn" onclick="navigator.clipboard.writeText(`{md.replace('`','').replace('"','').replace("'","")}`); alert('הדו\"ח הועתק ✅');">📋 העתק דו\"ח</button>
+          <button class="copy-btn" onclick="navigator.clipboard.writeText(`{html.replace('`','').replace('"','').replace("'","")}`); alert('הדו\"ח הועתק ✅');">📋 העתק דו\"ח</button>
         </div>
         """, height=80)
 
@@ -168,7 +165,6 @@ if run:
 if st.session_state["history"]:
     st.markdown("### 🕓 היסטוריית דוחות")
     for item in reversed(st.session_state["history"]):
-        exp_value = item.get("exp") or 0
-        exp_label = "ממוצע שוק" if exp_value == 0 else f"{exp_value} שנות ניסיון"
-        with st.expander(f"{item.get('job','לא צויין')} — {exp_label} — {item.get('time','לא ידוע')}"):
-            st.markdown(item.get("report", "אין דו\"ח להצגה"))
+        exp_label = "ממוצע שוק" if item["exp"] == 0 else f"{item['exp']} שנות ניסיון"
+        with st.expander(f"{item['job']} — {exp_label} — {item['time']}"):
+            st.components.v1.html(item["report"], height=600, scrolling=True)
