@@ -6,3 +6,4 @@ fpdf2
 matplotlib
 pandas
 xlsxwriter
+python-dotenv
