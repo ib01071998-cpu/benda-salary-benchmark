@@ -5,15 +5,15 @@ from openai import OpenAI
 from dotenv import load_dotenv
 
 # -------------------------------------------------
-# הגדרות מערכת
+# הגדרות כלליות
 # -------------------------------------------------
-st.set_page_config(page_title="בנצ'מארק שכר ישראל – MASTER REAL ISRAEL V2", layout="wide")
+st.set_page_config(page_title="בנצ'מארק שכר ישראל – MASTER REAL ISRAEL V3", layout="wide")
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 SERPER_KEY = os.getenv("SERPER_API_KEY")
 
 # -------------------------------------------------
-# עיצוב פרימיום
+# עיצוב מקצועי
 # -------------------------------------------------
 st.markdown("""
 <style>
@@ -31,17 +31,12 @@ tr:nth-child(even) td {background:#F9FBE7}
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------
-# פונקציה לשאיבת נתוני אמת מהשוק (SERPER)
+# שליפת נתוני אמת ממודעות (SERPER)
 # -------------------------------------------------
 def get_real_salary_data(job_title: str):
-    """שליפת מידע ממודעות דרושים בישראל + חילוץ טווחים מספריים"""
     url = "https://google.serper.dev/search"
     headers = {"X-API-KEY": SERPER_KEY}
-    sources = [
-        "site:alljobs.co.il", "site:drushim.co.il",
-        "site:globes.co.il", "site:ynet.co.il",
-        "site:maariv.co.il", "site:bizportal.co.il"
-    ]
+    sources = ["site:alljobs.co.il", "site:drushim.co.il", "site:globes.co.il"]
     all_snippets, numbers = [], []
 
     for src in sources:
@@ -53,7 +48,6 @@ def get_real_salary_data(job_title: str):
                 snippet = item.get("snippet", "")
                 if snippet:
                     all_snippets.append(snippet)
-                    # חילוץ טווחים כמו 12-18 אלף, או 20,000–25,000
                     found = re.findall(r'(\d{1,3}(?:,\d{3})?)[\s\-–]{1,3}(\d{1,3}(?:,\d{3})?)', snippet)
                     for match in found:
                         try:
@@ -70,11 +64,11 @@ def get_real_salary_data(job_title: str):
         avg_low, avg_high = round(statistics.mean(lows)), round(statistics.mean(highs))
         avg_text = f"{avg_low:,}–{avg_high:,} ₪"
     else:
-        avg_text = "לא זמין (אין נתוני אמת זמינים)"
+        avg_text = "לא נמצאו טווחים ריאליים"
     return {"snippets": " ".join(all_snippets[:40]), "avg_range": avg_text}
 
 # -------------------------------------------------
-# בניית טבלת בנצ'מארק
+# בניית טבלת בנצ'מארק (הוראות חכמות למודל)
 # -------------------------------------------------
 def generate_salary_table(job_title, experience, real_data):
     exp_text = "בהתאם לממוצע השוק" if experience == 0 else f"עבור {experience} שנות ניסיון"
@@ -82,42 +76,34 @@ def generate_salary_table(job_title, experience, real_data):
     avg = real_data.get("avg_range", "לא זמין")
 
     prompt = f"""
-להלן מידע ממקורות ישראליים על שכר לתפקיד "{job_title}" בישראל לשנת 2025:
+צור טבלת בנצ'מארק שכר לתפקיד "{job_title}" בישראל {exp_text} לשנת 2025.
+השתמש במידע ממודעות אמיתיות מהשוק הישראלי ({avg}):
 {snippets}
 
-הממוצע המשוער לפי מקורות אמיתיים: {avg}.
-
-צור טבלת בנצ'מארק שכר מקצועית עם הטווחים בלבד – אין להשתמש בערכים בודדים.
-
-הטבלה תכלול את כלל רכיבי השכר בישראל:
-שכר בסיס, עמלות, בונוסים, מענקים, שעות נוספות, אחזקת רכב, קרן השתלמות, פנסיה, ביטוחים, אש"ל, ימי הבראה, ציוד, טלפון נייד, דלק, חניה, חופשות, מתנות/רווחה.
-
-לכל רכיב:
-- הצג טווחים אמיתיים בלבד (לדוגמה 30,000–40,000 ₪ / 6%–7.5%).
-- הצג שלוש רמות (נמוכה, בינונית, גבוהה).
-- הצג ממוצע באותו פרמטר (אם אחוז → אחוז, אם ₪ → ₪).
-- **מנגנון תגמול מפורט ומבוסס שוק בישראל** (לא תיאור כללי):
-    - עמלות: 3%–5% מהמכירות, תקרה 10,000 ₪, יעדים חודשיים.
-    - בונוסים: 1–2 משכורות שנתיות לפי עמידה ביעדים.
-    - קרן השתלמות: 7% עובד + 7.5% מעסיק.
-    - פנסיה: 6% עובד + 6.5% מעסיק.
-    - רכב: רכב צמוד, שווי שוק 120–160 אלף ₪ (סקודה סופרב, קאמרי, מאזדה 6), כולל דלק וביטוח.
-    - דלק: כלול ברכב או החזר 1,500–2,000 ₪ לעובד פרטי.
-    - ביטוחים: ביטוח בריאות פרטי לעובד ובני משפחה, בעלות 300–600 ₪.
-    - אש"ל: 400–1,000 ₪ או כרטיס סיבוס בשווי זה.
-    - שעות נוספות: 125%–150% לפי חוק.
-- הצג עלות מעסיק ממוצעת לכל רכיב (₪).
-- הצג אחוז מהרכב הכולל של עלות השכר הכוללת (%).
-
-בסוף הצג תיבת סיכום הכוללת:
-- טווח שכר ברוטו כולל (₪).
-- טווח עלות מעסיק כוללת (₪).
-- סך שווי ההטבות הנלוות (₪).
+הנחיות עיצוב התוכן:
+- הצג **אך ורק טווחים** (לא ערכים בודדים), לדוגמה:
+  ₪12,000–₪15,000 / ‎6%–7.5%‎.
+- התאמת סוג הנתון לסוג הרכיב (₪ או %).
+- כלול בעמודה "מנגנון תגמול מפורט" את המנגנון המקובל בישראל לפי סוג רכיב:
+  • שכר בסיס – טווח שכר חודשי לפי דרג.
+  • עמלות – 3%–5% מהמכירות, תקרה 10,000 ₪.
+  • בונוסים – 1–2 משכורות שנתיות לפי עמידה ביעדים.
+  • מענקים – תמריץ חד-פעמי על ביצועים מיוחדים.
+  • קרן השתלמות – 7% עובד + 7.5% מעסיק.
+  • פנסיה – 6% עובד + 6.5% מעסיק.
+  • רכב – שווי שוק 120–160 אלף ₪ (סקודה סופרב, קאמרי, מאזדה 6), כולל דלק וביטוח.
+  • דלק – כלול ברכב או החזר 1,500–2,000 ₪.
+  • ביטוחים – בריאות, חיים, תאונות, 300–600 ₪.
+  • אש"ל – 400–1,000 ₪ או כרטיס סיבוס.
+  • שעות נוספות – 125%–150% לפי חוק.
+  • ציוד – מחשב, טלפון, רכב עבודה, לפי המקובל.
+- הצג בכל שורה: טווח נמוך, טווח גבוה, טווח ממוצע, מנגנון תגמול מפורט.
+- הצג עלות מעסיק מוערכת (₪) ואחוז מהרכב הכולל.
 """
     r = client.chat.completions.create(
         model="gpt-4-turbo",
         messages=[
-            {"role": "system", "content": "אתה אנליסט שכר בכיר בישראל. הפלט הוא טבלה אחת בלבד בעברית, עם טווחים בלבד, ללא מלל נוסף."},
+            {"role": "system", "content": "אנליסט שכר בכיר בישראל. צור טבלה אחת בלבד בעברית, מבוססת טווחים בלבד."},
             {"role": "user", "content": prompt}
         ],
         temperature=0.25,
@@ -125,13 +111,13 @@ def generate_salary_table(job_title, experience, real_data):
     return r.choices[0].message.content
 
 # -------------------------------------------------
-# ממשק משתמש
+# ממשק המשתמש
 # -------------------------------------------------
-st.title("💼 מערכת בנצ'מארק שכר – גרסת MASTER REAL ISRAEL V2")
+st.title("💼 מערכת בנצ'מארק שכר – גרסת MASTER REAL ISRAEL V3")
 
 col1, col2 = st.columns([2, 1])
 with col1:
-    job = st.text_input("שם המשרה (לדוג׳: סמנכ\"ל מכירות, מנהל לוגיסטיקה):")
+    job = st.text_input("שם המשרה (לדוג׳: מנהל מכירות, מנהל לוגיסטיקה):")
 with col2:
     exp = st.number_input("שנות ניסיון (0 = ממוצע שוק):", 0, 40, 0)
 
@@ -150,10 +136,10 @@ if run:
     if not job.strip():
         st.warning("אנא הזן שם משרה.")
     else:
-        with st.spinner("📡 שולף נתוני אמת ממקורות ישראליים..."):
+        with st.spinner("📡 שולף נתוני אמת ממודעות ישראליות..."):
             real_data = get_real_salary_data(job)
 
-        with st.spinner("מחשב בנצ'מארק חכם על סמך נתוני אמת..."):
+        with st.spinner("🧮 מחשב טווחים ריאליים ומבנה תגמול ישראלי..."):
             md = generate_salary_table(job, exp, real_data)
 
         st.markdown("### 📊 טבלת רכיבי שכר מלאה:")
@@ -177,7 +163,6 @@ if run:
 if st.session_state["history"]:
     st.markdown("### 🕓 היסטוריית דוחות")
     for item in reversed(st.session_state["history"]):
-        exp_value = item.get("exp") or 0
-        exp_label = "ממוצע שוק" if exp_value == 0 else f"{exp_value} שנות ניסיון"
-        with st.expander(f"{item.get('job','לא צויין')} — {exp_label} — {item.get('time','לא ידוע')}"):
-            st.markdown(item.get("report", "אין דו\"ח להצגה"))
+        exp_label = "ממוצע שוק" if item["exp"] == 0 else f"{item['exp']} שנות ניסיון"
+        with st.expander(f"{item['job']} — {exp_label} — {item['time']}"):
+            st.markdown(item["report"], unsafe_allow_html=True)
