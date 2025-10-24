@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 # -------------------------------------------------
 # הגדרות כלליות
 # -------------------------------------------------
-st.set_page_config(page_title="MASTER 4.5 – Smart Validation Edition", layout="wide")
+st.set_page_config(page_title="MASTER 4.6 – Real Market Benchmark", layout="wide")
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 SERPER_KEY = os.getenv("SERPER_API_KEY")
@@ -33,33 +33,10 @@ tr:nth-child(even) td{background:#F1F8E9}
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------
-# מנגנון בקרת איכות חכם (AI Validation)
-# -------------------------------------------------
-def validate_salary_range(job_title, min_val, max_val):
-    """בדיקה חכמה האם טווח השכר הגיוני לתפקיד"""
-    try:
-        prompt = f"""
-האם טווח שכר של {min_val:,}–{max_val:,} ₪ מתאים לתפקיד "{job_title}" בישראל?
-ענה רק 'כן' או 'לא' והוסף סיבה קצרה (לדוגמה: 'כן, טווח טיפוסי למנהלי מכירות בכירים' או 'לא, נמוך מדי לעומת שוק הייטק').
-"""
-        resp = client.chat.completions.create(
-            model="gpt-4-turbo",
-            messages=[
-                {"role":"system","content":"אתה אנליסט שכר בכיר בישראל. תענה בקצרה וברמת דיוק גבוהה."},
-                {"role":"user","content":prompt}
-            ],
-            temperature=0
-        )
-        answer = resp.choices[0].message.content
-        return "כן" in answer or "מתאים" in answer
-    except Exception:
-        return True  # במידה והמודל לא זמין, נניח תקין כדי לא לפגוע בריצה
-
-# -------------------------------------------------
-# שליפת נתונים ממספר מקורות אמיתיים
+# שליפת נתונים אמיתיים ממקורות ישראליים
 # -------------------------------------------------
 def get_live_salary_data(job_title: str) -> pd.DataFrame:
-    """שולף נתוני שכר אמיתיים ממספר אתרים ישראליים"""
+    """שולף נתוני שכר ממספר אתרים ישראליים אמיתיים"""
     url = "https://google.serper.dev/search"
     headers = {"X-API-KEY": SERPER_KEY}
     sources = [
@@ -78,53 +55,45 @@ def get_live_salary_data(job_title: str) -> pd.DataFrame:
             for item in items:
                 snippet = item.get("snippet", "")
                 nums = re.findall(r"\d{1,3}(?:,\d{3})", snippet)
-                for x in nums:
-                    val = int(x.replace(",", ""))
-                    # בדיקה חכמה אם המספר מתאים לתפקיד
-                    if validate_salary_range(job_title, val * 0.8, val * 1.2):
-                        rows.append({
-                            "source": src.split(":")[1].split(".")[0].capitalize(),
-                            "salary": val
-                        })
+                salaries = [int(x.replace(",", "")) for x in nums]
+                if salaries:
+                    rows.append({
+                        "source": src.split(":")[1].split(".")[0].capitalize(),
+                        "min": min(salaries),
+                        "max": max(salaries),
+                        "avg": sum(salaries) / len(salaries)
+                    })
         except Exception:
             continue
-    if not rows:
-        return pd.DataFrame(columns=["source", "min", "max", "avg"])
-    df = pd.DataFrame(rows)
-    df_summary = (
-        df.groupby("source", as_index=False)
-        .agg(min=("salary", "min"), max=("salary", "max"), avg=("salary", "mean"))
-    )
-    return df_summary
+    return pd.DataFrame(rows)
 
 # -------------------------------------------------
-# יצירת טבלת בנצ'מארק אמיתית
+# יצירת טבלת בנצ'מארק רחבה ומפורטת
 # -------------------------------------------------
 def generate_salary_table(job_title, experience, df):
-    """יוצר טבלת בנצ’מארק אמיתית מבוססת נתונים + GPT להשלמות"""
+    """יוצר טבלת בנצ’מארק מלאה ומבוססת נתוני אמת + השלמות GPT"""
     avg_market = int(df["avg"].mean()) if not df.empty else None
-    live_summary = f"נתוני אמת ממקורות ישראליים:\n{df.to_string(index=False)}" if not df.empty else "לא נמצאו נתוני אמת, הפלט יתבסס על GPT בלבד."
+    live_summary = f"נתוני אמת ממקורות שוק בישראל:\n{df.to_string(index=False)}" if not df.empty else "לא נמצאו נתוני אמת, הפלט יתבסס על GPT בלבד."
     exp_text = "בהתאם לממוצע השוק" if experience==0 else f"עבור {experience} שנות ניסיון"
 
     prompt = f"""
 {live_summary}
 
-צור טבלת בנצ׳מארק מפורטת לתפקיד "{job_title}" בישראל {exp_text} לשנת 2025.
-השתמש בנתונים שמופיעים למעלה כמקור אמת לשכר בסיס, והשלם את שאר הרכיבים לפי מקובל במשק.
+צור טבלת בנצ׳מארק מקיפה לתפקיד "{job_title}" בישראל {exp_text} לשנת 2025.
+התבסס על הנתונים למעלה, ובנה טבלה הכוללת את כלל רכיבי השכר הקיימים במשק.
 
-כלול רכיבים כגון:
-שכר בסיס, עמלות, בונוסים, מענקים, אחזקת רכב, שעות נוספות, אש"ל, קרן השתלמות, פנסיה, ביטוחים, ימי הבראה, ציוד, חניה, טלפון נייד, דלק, ביגוד, חופשות.
+יש לכלול:
+- שכר בסיס, עמלות, בונוסים, מענקים, אחזקת רכב, שעות נוספות, אש"ל, קרן השתלמות, פנסיה, ביטוחים, ימי הבראה, ציוד, חניה, טלפון נייד, דלק, ביגוד, חופשות.
+- עבור כל רכיב ציין:
+  * טווח שכר (₪)
+  * ממוצע שוק (₪)
+  * מנגנון תגמול מפורט ומבוסס (לדוג׳: 5% מהמכירות עד תקרה של 8,000 ₪)
+  * אחוז חברות שמציעות את הרכיב
+  * מגמת שוק (עולה / יציב / בירידה)
+  * עלות מעסיק משוערת (₪)
+  * אחוז מכלל עלות השכר הכוללת
 
-עבור כל רכיב, ציין:
-- טווח שכר (₪)
-- ממוצע שוק (₪)
-- מנגנון תגמול מפורט (לדוג׳ 5% מהמכירות, תקרה 8,000 ₪, יעד חודשי 200,000 ₪)
-- אחוז חברות שמציעות את הרכיב
-- מגמת שוק (עולה / יציב / בירידה)
-- עלות מעסיק (₪)
-- אחוז מכלל עלות השכר הכוללת
-
-הצג טבלה בלבד, ללא מלל נוסף.
+הצג את הנתונים בצורה של טבלה מקצועית בלבד, ללא טקסט נוסף.
 """
     r = client.chat.completions.create(
         model="gpt-4-turbo",
@@ -137,10 +106,10 @@ def generate_salary_table(job_title, experience, df):
     return r.choices[0].message.content, avg_market
 
 # -------------------------------------------------
-# ממשק המשתמש
+# ממשק משתמש
 # -------------------------------------------------
-st.title("💼 MASTER 4.5 – Smart Validation Edition")
-st.caption("מקור: GPT-4 Turbo + SERPER API + בקרת איכות חכמה | בנצ׳מארק אמיתי ומדויק")
+st.title("💼 MASTER 4.6 – Real Market Benchmark")
+st.caption("GPT-4 Turbo + SERPER API | בנצ׳מארק אמיתי ורחב על סמך מקורות שוק ישראליים")
 
 col1, col2 = st.columns([2,1])
 with col1:
@@ -162,7 +131,7 @@ if run:
     if not job.strip():
         st.warning("אנא הזן שם משרה.")
     else:
-        with st.spinner("📡 שואב נתונים ממקורות אמיתיים..."):
+        with st.spinner("📡 שואב נתונים ממקורות אמת בישראל..."):
             live_df = get_live_salary_data(job)
         st.markdown("### 🌐 נתוני אמת מהשוק:")
         if not live_df.empty:
@@ -170,7 +139,7 @@ if run:
         else:
             st.info("לא נמצאו נתונים אמיתיים, מוצג ממוצע GPT בלבד.")
 
-        with st.spinner("מפיק טבלת בנצ׳מארק חכמה..."):
+        with st.spinner("מפיק טבלת בנצ׳מארק אמינה ומפורטת..."):
             md, avg = generate_salary_table(job, exp, live_df)
         st.markdown("### 📊 טבלת רכיבי שכר מלאה:")
         st.markdown(md, unsafe_allow_html=True)
