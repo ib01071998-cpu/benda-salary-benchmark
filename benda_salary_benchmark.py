@@ -32,7 +32,7 @@ tr:nth-child(even) td {background:#F9FBE7}
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------
-# פונקציות עזר
+# פונקציות
 # -------------------------------------------------
 def get_sales_type(job_title: str):
     title = job_title.lower()
@@ -45,63 +45,62 @@ def get_sales_type(job_title: str):
     else:
         return "general"
 
-# -------------------------------------------------
-# שליפת נתוני אמת מ-Serper API
-# -------------------------------------------------
 def fetch_real_data(job_title):
     if not SERPER_API_KEY:
         return "לא הוגדר מפתח Serper API בקובץ .env"
-    
     headers = {"X-API-KEY": SERPER_API_KEY}
-    query = f"שכר {job_title} ישראל site:alljobs.co.il OR site:drushim.co.il OR site:jobmaster.co.il OR site:ynet.co.il OR site:bizportal.co.il"
-    
-    response = requests.post(
-        "https://google.serper.dev/search",
-        headers=headers,
-        json={"q": query, "num": 8, "hl": "he"}
-    )
+    query = f"שכר {job_title} בישראל site:alljobs.co.il OR site:drushim.co.il OR site:jobmaster.co.il OR site:bizportal.co.il"
+    response = requests.post("https://google.serper.dev/search", headers=headers, json={"q": query, "num": 8, "hl": "he"})
     results = response.json()
     snippets = []
     if "organic" in results:
         for r in results["organic"]:
             if "snippet" in r:
                 snippets.append(r["snippet"])
-    return "\n".join(snippets[:10]) if snippets else "לא נמצאו תוצאות עדכניות."
+    return "\n".join(snippets[:10]) if snippets else "לא נמצאו נתוני אמת."
 
-# -------------------------------------------------
-# הפקת דוח GPT עם שילוב הנתונים
-# -------------------------------------------------
 def generate_salary_table(job_title, experience):
     exp_text = "בהתאם לממוצע השוק" if experience == 0 else f"עבור {experience} שנות ניסיון"
     sales_type = get_sales_type(job_title)
     real_data = fetch_real_data(job_title)
 
-    sales_context = {
-        "field_sales": "אין תקרת עמלה ברוב המקרים, אך לעיתים יש תקרה רכה (פי 2 מהבסיס). הצג מדרגות 3%-7%.",
-        "inside_sales": "יש תקרת בונוס חודשית (2,000–4,000 ₪). הצג עמלות 1%-3%.",
-        "managerial_sales": "אין עמלות ישירות. הצג בונוס שנתי עד 25% מהשכר (תקרה של 3 משכורות).",
-        "general": "הצג מבנה תגמול ממוצע בשוק הישראלי."
-    }[sales_type]
+    if sales_type == "field_sales":
+        sales_context = (
+            "לתפקידי מכירות שטח לרוב אין תקרת עמלה, אך לעיתים יש תקרה רכה (פי 2 מהשכר הבסיסי). "
+            "הצג מדרגות עמלות ריאליות (3%-7%) עם מנגנון תגמול מלא."
+        )
+    elif sales_type == "inside_sales":
+        sales_context = (
+            "לתפקידי מכירות טלפוניות או מוקדים קיימת תקרת בונוס חודשית (2,000–4,000 ₪). "
+            "הצג עמלות 1%-3% ותקרות ריאליות."
+        )
+    elif sales_type == "managerial_sales":
+        sales_context = (
+            "לתפקידי ניהול בכירים (כמו סמנכ\"ל מכירות או מנהל תחום) אין עמלות ישירות, "
+            "אלא בונוס שנתי עד 25% מהשכר השנתי עם תקרה של 3 משכורות."
+        )
+    else:
+        sales_context = "הצג מבנה תגמול ממוצע בשוק הישראלי, כולל תקרות רק אם מקובלות במשרות דומות."
 
     prompt = f"""
-השתמש במידע הבא שאספת ממקורות ישראליים בזמן אמת:
+השתמש במידע הבא שנשלף ממקורות ישראליים בזמן אמת:
 {real_data}
 
-אתה אנליסט שכר בכיר בישראל. צור טבלת בנצ'מארק לשנת 2025 לתפקיד "{job_title}" {exp_text}.
-{sales_context}
+אתה אנליסט שכר בכיר בישראל. צור טבלת בנצ'מארק לתפקיד "{job_title}" {exp_text} לשנת 2025.
 
-הוראות:
-- הצג טבלה אחת בלבד בעברית, עם שלוש רמות תגמול (בסיסית / בינונית / גבוהה)
-- כלול רכיבים: שכר בסיס, עמלות, בונוסים, אחזקת רכב (עם שווי שוק ודגמים), קרנות, ביטוחים, אש"ל, טלפון, חופשות.
-- לכל רכיב: טווחים ריאליים, ממוצע שוק, מנגנון תגמול מפורט (כולל מדרגות ותקרות), עלות מעסיק (₪), אחוז מסך הכולל.
-- ברכב: ציין שווי שוק ממוצע (לדוגמה 180–240 אלף ₪) ודגמים (סקודה סופרב, טויוטה קאמרי, מאזדה 6).
-- סיים בסיכום קצר עם הערכת עלות מעסיק כוללת.
+הוראות מפורטות:
+- הצג טבלה אחת בלבד בעברית.
+- שלוש רמות תגמול: בסיסית / בינונית / גבוהה.
+- עמודות חובה: רכיב שכר | טווח (₪ או %) | ממוצע שוק (₪) | מנגנון תגמול מפורט | עלות מעסיק (₪) | אחוז מסך הכולל (%)
+- הצג **את כל רכיבי השכר הרלוונטיים בישראל**: שכר בסיס, עמלות, בונוסים, אחזקת רכב (עם שווי שוק ודגמים), קרן השתלמות, פנסיה, ביטוחים, אש"ל, שעות נוספות, טלפון, דלק, חניה, מתנות, ביגוד, רווחה, חופשות.
+- ברכיב "רכב חברה" כלול גם את שווי השוק של הרכב (180–240 אלף ₪) ודגמים (סקודה סופרב, טויוטה קאמרי, מאזדה 6).
+- לכל רכיב הצג גם "ממוצע במשק (₪)" נוסף בעמודה ייעודית.
+- אל תוסיף מלל או טקסט חיצוני מעבר לטבלה.
 """
-
     r = client.chat.completions.create(
         model="gpt-4-turbo",
         messages=[
-            {"role": "system", "content": "אתה אנליסט שכר ישראלי בכיר. הפלט שלך הוא תמיד טבלה אחת בלבד בעברית, ללא טקסט נוסף."},
+            {"role": "system", "content": "אתה אנליסט שכר בכיר בישראל. הפלט שלך הוא תמיד טבלה אחת בלבד בעברית, ללא טקסט נוסף."},
             {"role": "user", "content": prompt}
         ],
         temperature=0.2,
@@ -137,20 +136,13 @@ if run:
         with st.spinner("מבצע סריקה חכמה של מקורות ישראליים בזמן אמת..."):
             md, s_type = generate_salary_table(job, exp)
 
-        mapping = {
-            "field_sales": "🟩 מכירות שטח / B2B – ללא תקרה קשיחה",
-            "inside_sales": "🟧 מכירות טלפוניות / מוקדים – עם תקרת בונוס חודשית",
-            "managerial_sales": "🟦 ניהול מכירות בכיר – בונוס שנתי עם תקרה",
-            "general": "⬜ תפקיד כללי – מבנה תגמול ממוצע"
-        }
-        st.info(f"**זוהה סוג משרה:** {mapping.get(s_type)}")
-
-        st.markdown("### 📊 טבלת רכיבי שכר בזמן אמת:")
+        st.markdown("### 📊 טבלת רכיבי שכר מלאה (כולל ממוצע במשק):")
         st.markdown(md, unsafe_allow_html=True)
 
         st.markdown("""
         <div class="summary-box">
-          <div class="summary-line">🏢 <span class="summary-value">הדו״ח מבוסס על נתוני אמת ממקורות ישראליים בזמן אמת (AllJobs, Drushim, JobMaster וכו׳).</span></div>
+          <div class="summary-line">🏢 <span class="summary-value">מבוסס על נתוני אמת ממקורות ישראליים (AllJobs, Drushim, JobMaster, Bizportal).</span></div>
+          <div class="summary-line">🧮 <span class="summary-value">הנתונים כוללים ממוצע במשק לכל רכיב.</span></div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -166,7 +158,6 @@ if run:
         </div>
         """, height=80)
 
-# היסטוריה
 if st.session_state["history"]:
     st.markdown("### 🕓 היסטוריית דוחות")
     for item in reversed(st.session_state["history"]):
