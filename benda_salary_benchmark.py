@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 SERPER_KEY = os.getenv("SERPER_API_KEY")
+
 client = OpenAI(api_key=OPENAI_KEY)
 
 # -----------------------------------------------------------
@@ -24,7 +25,7 @@ st.markdown("""
 <style>
 * { direction: rtl; text-align: right; font-family: "Heebo", sans-serif; }
 h1 { text-align: center; color: #0D47A1; font-weight: 900; }
-h3 { color: #1565C0; margin-top: 25px; }
+h3 { color: #1565C0; margin-top: 20px; }
 table {
     width: 100%;
     border-collapse: collapse;
@@ -45,23 +46,20 @@ td {
     text-align: center;
 }
 tr:nth-child(even) td { background-color: #F1F8E9; }
-.report-box {
-    background-color: #E3F2FD;
-    padding: 15px;
-    border-radius: 12px;
-    margin-bottom: 20px;
-}
 button, .stButton>button {
     background: linear-gradient(90deg, #1E88E5, #42A5F5);
     color: white;
+    border: none;
+    border-radius: 8px;
     font-weight: bold;
-    border-radius: 10px;
+    padding: 10px 18px;
+    cursor: pointer;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------
-# פונקציה: חיפוש נתוני שכר חיים בישראל דרך Serper
+# פונקציה: חיפוש נתוני שכר חיים מישראל (דרך Serper)
 # -----------------------------------------------------------
 def get_live_salary_data(job_title):
     url = "https://google.serper.dev/search"
@@ -86,45 +84,43 @@ def get_live_salary_data(job_title):
 def generate_salary_table(job_title, experience, live_data):
     exp_text = "בהתאם לממוצע השוק" if experience == 0 else f"בהתאם לעובד עם {experience} שנות ניסיון"
     prompt = f"""
-הנה מידע אמיתי מהאינטרנט על משרת "{job_title}":
+הנה מידע מהאינטרנט על משרת "{job_title}":
 {live_data}
 
-בהתאם לכך ולידע שלך על השוק הישראלי לשנת 2025,
-צור טבלה מפורטת של רכיבי השכר בישראל, כולל:
-
+צור טבלה אינפורמטיבית ומפורטת של רכיבי שכר בישראל לשנת 2025 עבור תפקיד זה, כולל:
 - טווחי שכר (מינימום, ממוצע, מקסימום)
-- פירוט מנגנוני תגמול ברמה גבוהה מאוד:
-  • עמלות אישיות, קבוצתיות, לפי יעד, לפי רווח גולמי
-  • בונוס שנתי / רבעוני לפי KPIs, עמידה ביעדים, שימור לקוחות
-  • תגמולים לא כספיים (ימי חופשה, הכשרות, תמריצים)
-- אחוז חברות שמציעות רכיב זה
-- מגמת שוק (עלייה / ירידה / יציב)
-- עלות מעסיק לרכיב
-- אחוז מעלות כוללת
+- מנגנוני תגמול משתנים מפורטים כגון:
+  • עמלות על מכירות – לפי אחוזים, מדרגות או יעדים
+  • בונוסים רבעוניים/שנתיים – לפי אחוז מהרווח או מהשכר
+  • יעדים אישיים וקבוצתיים
+  • בונוס התמדה או ותק
+  • בונוס על שביעות רצון לקוחות
+  • תמריצים לא כספיים (טיולים, גיפט קארדים, הכשרות)
+- אחוז החברות שמציעות כל רכיב
+- מגמת שוק (↑ עלייה / ↓ ירידה / → יציב)
+- עלות מעסיק משוערת (₪)
+- אחוז מתוך עלות כוללת
 
 עמודות חובה:
-| רכיב שכר | טווח שכר (₪) | ממוצע שוק (₪) | מנגנון תגמול מפורט | אחוז חברות שמציעות רכיב זה | מגמת שוק | עלות מעסיק (₪) | אחוז מעלות כוללת |
+| רכיב שכר | טווח שכר (₪) | ממוצע שוק (₪) | מנגנון תגמול / תנאי | אחוז חברות שמציעות רכיב זה | מגמת שוק | עלות מעסיק (₪) | אחוז מעלות כוללת |
 
-לאחר מכן הצג שורה מסכמת של:
-**סה״כ עלות מעסיק ממוצעת (₪)**
-
-הצג רק טבלה אחת — ללא טקסט נוסף.
+הצג רק טבלה, ללא הסברים נוספים.
 """
     response = client.chat.completions.create(
         model="gpt-4-turbo",
         messages=[
-            {"role": "system", "content": "אתה אנליסט שכר בכיר בישראל. הפלט שלך הוא טבלה בלבד, בשפה מקצועית ומדויקת."},
+            {"role": "system", "content": "אתה אנליסט שכר בכיר בישראל. הפלט שלך הוא טבלה בלבד."},
             {"role": "user", "content": prompt}
         ],
-        temperature=0.35,
+        temperature=0.3,
     )
     return response.choices[0].message.content
 
 # -----------------------------------------------------------
 # ממשק משתמש
 # -----------------------------------------------------------
-st.title("💎 MASTER 4.0 PRO – מערכת בנצ׳מארק שכר בזמן אמת")
-st.caption("מבוססת GPT + Serper | נתוני אמת מהשוק הישראלי | גרסה מקצועית")
+st.title("💎 MASTER 4.0 – מערכת בנצ׳מארק שכר בזמן אמת")
+st.caption("מבוססת GPT + Serper | נתוני אמת מהשוק הישראלי | כולל ניהול היסטוריה")
 
 col1, col2 = st.columns([2, 1])
 with col1:
@@ -135,7 +131,17 @@ with col2:
 if "history" not in st.session_state:
     st.session_state["history"] = []
 
-if st.button("🔍 הפק דו״ח"):
+col3, col4 = st.columns([1,1])
+with col3:
+    generate_btn = st.button("🔍 הפק דו״ח")
+with col4:
+    clear_history = st.button("🗑️ נקה היסטוריה")
+
+if clear_history:
+    st.session_state["history"] = []
+    st.success("היסטוריית החיפושים נמחקה בהצלחה ✅")
+
+if generate_btn:
     if not job_title.strip():
         st.warning("אנא הזן שם משרה.")
     else:
@@ -144,7 +150,7 @@ if st.button("🔍 הפק דו״ח"):
             st.markdown("### 🌐 מידע חי מהשוק הישראלי:")
             st.markdown(live_data)
 
-        with st.spinner("מנתח ומפיק דו״ח GPT מקצועי..."):
+        with st.spinner("מפיק דו״ח GPT מתקדם..."):
             report = generate_salary_table(job_title, experience, live_data)
             st.markdown("### 📊 דו״ח שכר מפורט:")
             st.markdown(report, unsafe_allow_html=True)
@@ -157,16 +163,10 @@ if st.button("🔍 הפק דו״ח"):
         })
 
 # -----------------------------------------------------------
-# היסטוריה מלאה + ניקוי
+# הצגת היסטוריית דוחות
 # -----------------------------------------------------------
 if st.session_state["history"]:
-    st.markdown("### 🕓 היסטוריית דוחות")
-    clear_col, _ = st.columns([1, 4])
-    with clear_col:
-        if st.button("🗑 נקה היסטוריה"):
-            st.session_state["history"] = []
-            st.success("ההיסטוריה נוקתה בהצלחה ✅")
-
+    st.markdown("### 🕓 היסטוריית חיפושים")
     for item in reversed(st.session_state["history"]):
         job = item.get("job", "לא צויין")
         exp = item.get("experience", 0)
