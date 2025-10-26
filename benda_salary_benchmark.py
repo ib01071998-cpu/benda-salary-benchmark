@@ -1,20 +1,20 @@
 import streamlit as st
 import os, re, requests
-from datetime import datetime
 from openai import OpenAI
 from dotenv import load_dotenv
 import pandas as pd
+from datetime import datetime
 
 # -------------------------------------------------
 # הגדרות מערכת
 # -------------------------------------------------
-st.set_page_config(page_title="מערכת בנצ'מארק שכר – גרסת Ultimate ישראלית", layout="wide")
+st.set_page_config(page_title="מערכת בנצ'מארק שכר - גרסה ישראלית", layout="wide")
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 SERPER_KEY = os.getenv("SERPER_API_KEY")
 
 # -------------------------------------------------
-# עיצוב
+# עיצוב ממשק
 # -------------------------------------------------
 st.markdown("""
 <style>
@@ -33,7 +33,7 @@ tr:nth-child(even) td {background:#F9FBE7}
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------
-# שליפת נתוני אמת ממקורות ישראליים
+# שליפת נתוני אמת ממקורות ישראליים (דרך SERPER)
 # -------------------------------------------------
 def get_live_salary_data(job_title: str):
     url = "https://google.serper.dev/search"
@@ -43,8 +43,7 @@ def get_live_salary_data(job_title: str):
         "site:drushim.co.il",
         "site:globes.co.il",
         "site:bizportal.co.il",
-        "site:maariv.co.il",
-        "site:ynet.co.il"
+        "site:calcalist.co.il"
     ]
     rows = []
     for src in sources:
@@ -68,111 +67,80 @@ def get_live_salary_data(job_title: str):
     return pd.DataFrame(rows)
 
 # -------------------------------------------------
-# הפקת טבלת בנצ'מארק מקצועית מלאה
+# יצירת טבלת בנצ'מארק עם GPT
 # -------------------------------------------------
-def generate_salary_table(job_title, experience, df):
-    exp_text = "בהתאם לממוצע השוק" if experience == 0 else f"עבור {experience} שנות ניסיון"
-    live_summary = "לא נמצאו נתוני אמת – יוצג בנצ'מארק ממוצע." if df.empty else f"נתוני אמת משוק העבודה בישראל:\n{df.to_string(index=False)}"
+def generate_salary_table(job_title, df):
+    live_summary = (
+        "לא נמצאו נתוני אמת – יוצג בנצ'מארק ממוצע בלבד."
+        if df.empty else
+        f"נתוני אמת ממקורות ישראליים:\n{df.to_string(index=False)}"
+    )
 
     prompt = f"""
 {live_summary}
 
-צור טבלת בנצ'מארק שכר מקצועית עבור התפקיד "{job_title}" בישראל {exp_text} לשנת 2025.
+צור טבלת שכר מלאה ומפורטת לתפקיד "{job_title}" בישראל (2025),
+בהתבסס על נתוני אמת משוק העבודה הישראלי (AllJobs, Drushim, Globes, Calcalist, Bizportal)
+ועל נתוני שוק אמיתיים מחברות יבוא, אלקטרוניקה ולוגיסטיקה הדומות לבנדא מגנטיק.
 
-הצג את הטבלה **בפורמט אחיד בלבד**:
-עמודות:  
-רכיב שכר | טווח שכר או אחוזים | בסיסית (₪) | בינונית (₪) | גבוהה (₪) | ממוצע שוק (₪) | מנגנון תגמול מפורט | עלות מעסיק ממוצעת (₪) | אחוז מעלות השכר הכוללת (%)
+הצג את כל רכיבי השכר האפשריים:
+שכר בסיס, עמלות, בונוסים, מענקים, רכב חברה, שעות נוספות, קרן השתלמות, פנסיה, ביטוחים, אש"ל, ימי הבראה, ציוד, טלפון נייד, דלק, חניה, חופשות, מתנות ורווחה.
 
-⚙️ כללים:
-- הצג את כל רכיבי השכר הרלוונטיים: שכר בסיס, עמלות, בונוסים, מענקים, אחזקת רכב (כולל שווי שוק ודגמים), שעות נוספות, קרן השתלמות, פנסיה, ביטוחים, אש"ל, ימי הבראה, ציוד, טלפון נייד, דלק, חניה, חופשות, מתנות/ביגוד/רווחה.
-- אם יש רכיבים רלוונטיים לפי סוג המשרה (כוננויות, אופציות, רווחה, הוצאות), הוסף אותם.
-- הצג טווחים מציאותיים לפי השוק הישראלי, ללא עיגול יתר.
-- ברכיבי שכר משתנים (עמלות, בונוסים וכו׳) הצג **שלושה מודלים ישראליים נפוצים** באותו שדה של מנגנון תגמול.
+בכל שורה הצג:
+- טווח שכר או אחוזים (לדוג׳ 3%–7% או 10,000–14,000 ₪)
+- בסיסית / בינונית / גבוהה
+- ממוצע שוק (₪)
+- מנגנון תגמול מפורט בהתאם לנורמות השוק בישראל (למשל: עמלות 5% מהמכירות נטו עד תקרה של 8,000 ₪)
+- עלות מעסיק ממוצעת (₪)
+- אחוז מעלות השכר הכוללת (%)
 
-🇮🇱 מנגנוני תגמול ישראליים לפי סוג רכיב:
-שכר בסיס — משולם חודשי, לעיתים כולל שעות נוספות גלובליות.
-עמלות — לפי מכירות נטו: 3%–7%. דוגמה: מדרגות (3% עד 100K ₪, 5% עד 200K ₪, 7% מעל). תקרה 10–12K ₪.
-בונוסים — חודשי/רבעוני/שנתי לפי עמידה ב־KPI (רווח, גבייה, שביעות רצון). 5K–15K ₪.
-רכב חברה — קבוצה 3–6. שווי שוק 140–240K ₪. דגמים: טויוטה קורולה, סקודה סופרב, יונדאי טוסון. זקיפת שווי 2,800–3,500 ₪.
-קרן השתלמות — 7.5% מעסיק + 2.5% עובד.
-פנסיה — 6.5% מעסיק + 6% עובד + 8.33% פיצויים.
-סיבוס — 700–1,000 ₪ בחודש.
-אש"ל — 400–800 ₪ בהתאם לאופי התפקיד.
-ביטוח בריאות — השתתפות 300–600 ₪ לחודש.
-ימי הבראה — 5–10 ימים × 450 ₪.
-טלפון נייד — 150–300 ₪.
-דלק — 2.0–2.4 ₪ לק"מ.
-ציוד / מחשב — 100–150 ₪ החזר תקשורת חודשית.
-שי לחגים / ביגוד — 800–1,500 ₪ לשנה.
+⚠️ רכיב "רכב חברה":
+ציין את שווי השוק של הרכב (₪) ודגמים תואמים.
+בעלות מעסיק הצג את זקיפת השווי (לדוג׳ 3,000 ₪ לחודש לקבוצה 4).
 
-🧮 חישוב עלות מעסיק:
-עלות מעסיק ממוצעת = ממוצע שוק × 1.35.
-אחוז מעלות כוללת – הערכה יחסית בין רכיבים.
+הפלט יהיה **אך ורק טבלה אחת מסודרת** בפורמט כמו בדוגמה הבאה:
 
-הצג אך ורק טבלה אחת מסודרת וברורה ללא טקסט חופשי נוסף.
+| רכיב שכר | טווח שכר | בסיסית | בינונית | גבוהה | ממוצע שוק (₪) | מנגנון תגמול מפורט | עלות מעסיק ממוצעת (₪) | אחוז מעלות שכר כוללת (%) |
+
+בסיום הוסף שורה נפרדת מחוץ לטבלה עם:
+💰 שכר ברוטו ממוצע כולל  
+🏢 עלות מעסיק כוללת (שכר × 1.35 + עלויות נוספות)  
+🚗 זקיפת שווי רכב ממוצעת (כ־3,000 ₪ לחודש)
 """
     r = client.chat.completions.create(
         model="gpt-4-turbo",
         messages=[
-            {"role": "system", "content": "אתה אנליסט שכר בכיר בישראל. הפלט הוא טבלה אחת בלבד בעברית, ללא הסברים נוספים."},
+            {"role": "system", "content": "אתה אנליסט שכר בכיר בישראל. הפלט הוא טבלה אחת בלבד בעברית, ללא מלל נוסף."},
             {"role": "user", "content": prompt}
         ],
-        temperature=0.15,
+        temperature=0.25,
     )
     return r.choices[0].message.content
 
 # -------------------------------------------------
 # ממשק המשתמש
 # -------------------------------------------------
-st.title("💼 מערכת בנצ'מארק שכר – גרסת Ultimate ישראלית")
+st.title("💼 מערכת בנצ'מארק שכר - גרסה ישראלית מלאה")
 
-col1, col2 = st.columns([2, 1])
-with col1:
-    job = st.text_input("שם המשרה (לדוג׳: מנהל מכירות, מנהל לוגיסטיקה, אנליסט שכר):")
-with col2:
-    exp = st.number_input("שנות ניסיון (0 = ממוצע שוק):", 0, 40, 0)
+job = st.text_input("הזן שם משרה (לדוג׳: מנהל מכירות, מנהל לוגיסטיקה, טכנאי שירות):")
 
-if "history" not in st.session_state:
-    st.session_state["history"] = []
-
-btn1, btn2 = st.columns([1, 1])
-with btn1:
-    run = st.button("🚀 הפק דו״ח")
-with btn2:
-    if st.button("🗑️ נקה היסטוריה"):
-        st.session_state["history"] = []
-        st.success("היסטוריה נוקתה בהצלחה ✅")
-
-if run:
+if st.button("🚀 הפק דו״ח"):
     if not job.strip():
-        st.warning("אנא הזן שם משרה.")
+        st.warning("אנא הזן שם משרה תקפה.")
     else:
-        with st.spinner("📡 שולף נתונים ממקורות ישראליים (AllJobs, Drushim, Globes, Bizportal)..."):
+        with st.spinner("📡 שולף נתוני אמת ממקורות ישראליים..."):
             df = get_live_salary_data(job)
 
-        with st.spinner("🧠 מחשב בנצ'מארק ומפיק טבלת שכר מלאה..."):
-            md = generate_salary_table(job, exp, df)
+        with st.spinner("🧠 מפיק טבלת בנצ'מארק מלאה ומדויקת..."):
+            md = generate_salary_table(job, df)
 
         st.markdown("### 📊 טבלת רכיבי שכר מלאה:")
         st.markdown(md, unsafe_allow_html=True)
 
-        st.session_state["history"].append({
-            "job": job, "exp": exp,
-            "time": datetime.now().strftime("%d/%m/%Y %H:%M"),
-            "report": md
-        })
-
-        st.components.v1.html(f"""
-        <div style="text-align:center; margin-top:10px;">
-          <button class="copy-btn" onclick="navigator.clipboard.writeText(`{md.replace('`','').replace('"','').replace("'","")}`); alert('הדו\"ח הועתק ✅');">📋 העתק דו\"ח</button>
+        st.markdown("""
+        <div class="summary-box">
+          <div class="summary-line">💰 <span class="summary-value">שכר ברוטו ממוצע כולל:</span> לפי ממוצעי השוק בטבלה.</div>
+          <div class="summary-line">🏢 <span class="summary-value">עלות מעסיק כוללת:</span> שכר × 1.35 + עלויות נלוות (רכב, ביטוחים, סיבוס וכו').</div>
+          <div class="summary-line">🚗 <span class="summary-value">זקיפת שווי רכב חברה:</span> לפי קבוצת רכב ממוצעת (כ־3,000 ₪ לחודש).</div>
         </div>
-        """, height=80)
-
-# היסטוריית דוחות
-if st.session_state["history"]:
-    st.markdown("### 🕓 היסטוריית דוחות")
-    for item in reversed(st.session_state["history"]):
-        exp_value = item.get("exp") or 0
-        exp_label = "ממוצע שוק" if exp_value == 0 else f"{exp_value} שנות ניסיון"
-        with st.expander(f"{item.get('job','לא צויין')} — {exp_label} — {item.get('time','לא ידוע')}"):
-            st.markdown(item.get("report", "אין דו\"ח להצגה"))
+        """, unsafe_allow_html=True)
