@@ -8,7 +8,7 @@ from datetime import datetime
 # -------------------------------------------------
 # הגדרות מערכת
 # -------------------------------------------------
-st.set_page_config(page_title="💼 מערכת בנצ'מארק שכר – גרסה חכמה ואוטומטית 🇮🇱", layout="wide")
+st.set_page_config(page_title="💼 מערכת בנצ'מארק שכר – Benchmark AI Ultimate 🇮🇱", layout="wide")
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 SERPER_KEY = os.getenv("SERPER_API_KEY")
@@ -32,7 +32,7 @@ tr:nth-child(even) td {background:#F9FBE7}
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------
-# פונקציה לזיהוי הדרג מתוך שם המשרה
+# זיהוי דרג מתוך שם המשרה
 # -------------------------------------------------
 def detect_role_level(job_title: str) -> str:
     job_title = job_title.lower()
@@ -50,7 +50,20 @@ def detect_role_level(job_title: str) -> str:
         return "לא מוגדר"
 
 # -------------------------------------------------
-# שליפת נתוני אמת ממקורות ישראליים
+# נתוני רכב לפי דרג
+# -------------------------------------------------
+def get_vehicle_data(level: str):
+    data = {
+        "מנכ״ל": ("קבוצה 7", "Volvo XC60, Audi Q5, Lexus NX", "330,000–400,000 ₪", "4,200 ₪"),
+        "סמנכ״ל": ("קבוצה 6", "Mazda CX-5, Skoda Superb, Hyundai Tucson", "240,000–280,000 ₪", "3,200 ₪"),
+        "בכיר": ("קבוצה 5", "Toyota Corolla Hybrid, Kia Niro, Peugeot 3008", "200,000–240,000 ₪", "2,900 ₪"),
+        "ביניים": ("קבוצה 4", "Kia Sportage, Hyundai i30, Toyota Corolla", "160,000–200,000 ₪", "2,500 ₪"),
+        "זוטר": ("קבוצה 2", "Kia Picanto, Hyundai i20, Toyota Yaris", "110,000–130,000 ₪", "1,800 ₪"),
+    }
+    return data.get(level, ("לא ידוע", "-", "-", "-"))
+
+# -------------------------------------------------
+# נתוני אמת ממקורות ישראליים
 # -------------------------------------------------
 def get_live_salary_data(job_title, company_size, industry, region, exp, level):
     url = "https://google.serper.dev/search"
@@ -76,7 +89,7 @@ def get_live_salary_data(job_title, company_size, industry, region, exp, level):
         return pd.DataFrame()
 
 # -------------------------------------------------
-# הפקת טבלת בנצ'מארק
+# בניית טבלת שכר
 # -------------------------------------------------
 def generate_salary_table(job_title, company_size, industry, region, exp, df, level):
     exp_text = "בהתאם לממוצע השוק" if exp == 0 else f"עבור {exp} שנות ניסיון"
@@ -85,27 +98,27 @@ def generate_salary_table(job_title, company_size, industry, region, exp, df, le
         if df.empty else
         f"נתוני אמת ממקורות ישראליים:\n{df.to_string(index=False)}"
     )
+    vehicle_group, vehicle_models, vehicle_value, vehicle_tax = get_vehicle_data(level)
 
     prompt = f"""
 {live_summary}
 
-צור טבלת שכר מפורטת ומדויקת לתפקיד "{job_title}" בישראל בשנת 2025,
-בדרג "{level}", עבור חברה בגודל "{company_size}", בתחום "{industry}", באזור "{region}", {exp_text}.
+צור טבלת בנצ'מארק שכר לתפקיד "{job_title}" בישראל בשנת 2025 בדרג "{level}".
+ענף: "{industry}", גודל חברה: "{company_size}", אזור: "{region}", {exp_text}.
 
-התאם את הנתונים לשוק הישראלי האמיתי (ענפים דומים לבנדא מגנטיק – יבוא, לוגיסטיקה, אלקטרוניקה, קמעונאות טכנולוגית).
+הצג טבלה אינפורמטיבית בלבד (ללא מלל חופשי) עם העמודות:
+"רכיב שכר", "טווח", "ממוצע", "מנגנון תגמול מפורט", "עלות מעסיק (₪)", "% מעלות כוללת".
 
-הצג טבלה הכוללת את כל רכיבי השכר המקובלים:
-שכר בסיס, עמלות, בונוסים, מענקים, רכב חברה (כולל שווי שוק ודגמים), קרן השתלמות, פנסיה, ביטוחים, אש"ל, שעות נוספות, ימי הבראה, טלפון נייד, חופשות, ציוד, רווחה.
+הנחיות מיוחדות:
+- הממוצע חייב להתאים לסוג הערכים בטווח (אם באחוזים – באחוזים; אם בשקלים – בשקלים)
+- כל הערכים יהיו מציאותיים ומותאמים לשוק הישראלי (ענפים כמו בנדא מגנטיק)
+- ברכיב רכב חברה השתמש בנתוני הדרג:
+  • קבוצת רכב: {vehicle_group}
+  • דגמים לדוגמה: {vehicle_models}
+  • שווי שוק: {vehicle_value}
+  • זקיפת שווי חודשית לעובד: {vehicle_tax}
 
-לכל רכיב הצג:
-- טווח שכר או אחוזים (לדוג׳ 3%–7% או 10,000–14,000 ₪)
-- בסיסית / בינונית / גבוהה
-- ממוצע שוק (₪)
-- מנגנון תגמול מפורט בהתאם לנוהג בישראל באותו דרג
-- עלות מעסיק ממוצעת (₪)
-- אחוז מעלות השכר הכוללת (%)
-
-בסוף הטבלה הוסף שורה מסכמת המציגה:
+בסוף הטבלה הוסף שורה מסכמת עם:
 💰 שכר ברוטו ממוצע כולל  
 🏢 עלות מעסיק כוללת (שכר × 1.35 + עלויות נלוות)
 """
@@ -122,7 +135,7 @@ def generate_salary_table(job_title, company_size, industry, region, exp, df, le
 # -------------------------------------------------
 # ממשק המשתמש
 # -------------------------------------------------
-st.title("💼 מערכת בנצ'מארק שכר – גרסה עם זיהוי דרג אוטומטי 🇮🇱")
+st.title("💼 מערכת בנצ'מארק שכר – Benchmark AI Ultimate 🇮🇱")
 
 col1, col2 = st.columns([2, 1])
 with col1:
@@ -147,7 +160,7 @@ if st.button("🚀 הפק דו״ח"):
     else:
         detected_level = detect_role_level(job)
         st.info(f"🔍 דרג מזוהה: {detected_level}")
-        with st.spinner("📡 שולף נתוני אמת ממקורות ישראליים..."):
+        with st.spinner("📡 שולף נתונים ממקורות ישראליים..."):
             df = get_live_salary_data(job, company_size, industry, region, exp, detected_level)
 
         with st.spinner("🧠 מחשב בנצ'מארק חכם..."):
