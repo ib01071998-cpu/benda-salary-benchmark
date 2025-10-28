@@ -20,6 +20,7 @@ st.markdown("""
 <style>
 * { direction: rtl; text-align: right; font-family: "Heebo", sans-serif; }
 h1 { color:#0D47A1; text-align:center; font-weight:900; margin-bottom:6px; }
+h2 { color:#1565C0; font-weight:800; margin-top:20px; }
 table {width:100%; border-collapse:collapse; border-radius:12px; overflow:hidden; box-shadow:0 3px 12px rgba(0,0,0,0.1)}
 th {background:#1976D2;color:#fff;padding:12px; font-weight:700; border:1px solid #E3F2FD; text-align:center}
 td {background:#fff;border:1px solid #E3F2FD;padding:10px;text-align:center;font-size:15px}
@@ -32,25 +33,28 @@ tr:nth-child(even) td {background:#F9FBE7}
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------
-# זיהוי דרג מתוך שם המשרה
+# ניקוי וזיהוי דרג
 # -------------------------------------------------
+def normalize_text(text: str) -> str:
+    return re.sub(r"[\"׳״׳׳']", "", text.replace("’", "").replace("”", "").replace("“", "")).lower().strip()
+
 def detect_role_level(job_title: str) -> str:
-    job_title = job_title.lower()
-    if any(word in job_title for word in ["מנכ", "ceo", "chief executive"]):
+    job = normalize_text(job_title)
+    if any(word in job for word in ["מנכל", "ceo", "chief executive", "chief officer"]):
         return "מנכ״ל"
-    elif any(word in job_title for word in ["סמנכ", "vp", "vice president"]):
+    elif any(word in job for word in ["סמנכל", "סמנכ", "vp", "vice president", "v.p", "vicepresident"]):
         return "סמנכ״ל"
-    elif any(word in job_title for word in ["מנהל בכיר", "head of", "director", "אגף"]):
+    elif any(word in job for word in ["מנהל בכיר", "head of", "director", "ראש אגף", "מנהל תחום", "chief", "lead"]):
         return "בכיר"
-    elif any(word in job_title for word in ["מנהל", "אחראי", "ראש צוות", "supervisor"]):
+    elif any(word in job for word in ["מנהל", "אחראי", "supervisor", "ראש צוות", "team leader"]):
         return "ביניים"
-    elif any(word in job_title for word in ["נציג", "עוזר", "רכז", "מתאם", "עובד"]):
+    elif any(word in job for word in ["נציג", "עוזר", "רכז", "מתאם", "עובד", "assistant", "coordinator", "representative"]):
         return "זוטר"
     else:
         return "לא מוגדר"
 
 # -------------------------------------------------
-# נתוני רכב לפי דרג
+# רכב לפי דרג
 # -------------------------------------------------
 def get_vehicle_data(level: str):
     data = {
@@ -63,7 +67,7 @@ def get_vehicle_data(level: str):
     return data.get(level, ("לא ידוע", "-", "-", "-"))
 
 # -------------------------------------------------
-# נתוני אמת ממקורות ישראליים
+# שליפת נתונים ממקורות ישראליים
 # -------------------------------------------------
 def get_live_salary_data(job_title, company_size, industry, region, exp, level):
     url = "https://google.serper.dev/search"
@@ -89,7 +93,7 @@ def get_live_salary_data(job_title, company_size, industry, region, exp, level):
         return pd.DataFrame()
 
 # -------------------------------------------------
-# בניית טבלת שכר
+# יצירת טבלת בנצ'מארק מלאה
 # -------------------------------------------------
 def generate_salary_table(job_title, company_size, industry, region, exp, df, level):
     exp_text = "בהתאם לממוצע השוק" if exp == 0 else f"עבור {exp} שנות ניסיון"
@@ -103,29 +107,33 @@ def generate_salary_table(job_title, company_size, industry, region, exp, df, le
     prompt = f"""
 {live_summary}
 
-צור טבלת בנצ'מארק שכר לתפקיד "{job_title}" בישראל בשנת 2025 בדרג "{level}".
-ענף: "{industry}", גודל חברה: "{company_size}", אזור: "{region}", {exp_text}.
+צור טבלת שכר מפורטת ומלאה לתפקיד "{job_title}" בישראל בשנת 2025 בדרג "{level}".
+הנתונים צריכים להיות ריאליים ומתאימים לשוק הישראלי, ובפרט לחברות דומות לבנדא מגנטיק (יבוא, לוגיסטיקה, אלקטרוניקה, קמעונאות טכנולוגית).
 
-הצג טבלה אינפורמטיבית בלבד (ללא מלל חופשי) עם העמודות:
-"רכיב שכר", "טווח", "ממוצע", "מנגנון תגמול מפורט", "עלות מעסיק (₪)", "% מעלות כוללת".
+כלול את *כל* רכיבי השכר המקובלים:
+שכר בסיס, עמלות, בונוסים, מענקים, אש"ל, שעות נוספות, קרן השתלמות, פנסיה, ביטוחים, ימי הבראה, רכב חברה, טלפון נייד, אינטרנט, דלק, חניה, ביגוד, מתנות, חופשות, ציוד, רווחה, ארוחות, ימי מחלה, הטבות נוספות.
 
-הנחיות מיוחדות:
-- הממוצע חייב להתאים לסוג הערכים בטווח (אם באחוזים – באחוזים; אם בשקלים – בשקלים)
-- כל הערכים יהיו מציאותיים ומותאמים לשוק הישראלי (ענפים כמו בנדא מגנטיק)
-- ברכיב רכב חברה השתמש בנתוני הדרג:
-  • קבוצת רכב: {vehicle_group}
-  • דגמים לדוגמה: {vehicle_models}
-  • שווי שוק: {vehicle_value}
-  • זקיפת שווי חודשית לעובד: {vehicle_tax}
+לכל רכיב הצג:
+- טווח (לדוג׳ 10,000–14,000 ₪ או 3%–7%)
+- ממוצע תואם סוג הערכים
+- מנגנון תגמול מפורט לפי הנוהג בישראל
+- עלות מעסיק (₪)
+- אחוז מעלות כוללת (%)
 
-בסוף הטבלה הוסף שורה מסכמת עם:
+ברכיב רכב חברה השתמש בנתונים:
+• קבוצת רכב: {vehicle_group}
+• דגמים לדוגמה: {vehicle_models}
+• שווי שוק: {vehicle_value}
+• זקיפת שווי חודשית לעובד: {vehicle_tax}
+
+בסוף הטבלה הצג שורה מסכמת עם:
 💰 שכר ברוטו ממוצע כולל  
 🏢 עלות מעסיק כוללת (שכר × 1.35 + עלויות נלוות)
 """
     r = client.chat.completions.create(
         model="gpt-4-turbo",
         messages=[
-            {"role": "system", "content": "אתה אנליסט שכר בכיר בישראל. הפלט הוא טבלה אחת בלבד בעברית, ללא מלל נוסף."},
+            {"role": "system", "content": "אתה אנליסט שכר בכיר בישראל. הפלט הוא טבלה אחת בלבד בעברית, ללא טקסט נוסף."},
             {"role": "user", "content": prompt}
         ],
         temperature=0.25,
@@ -162,13 +170,10 @@ if st.button("🚀 הפק דו״ח"):
         st.info(f"🔍 דרג מזוהה: {detected_level}")
         with st.spinner("📡 שולף נתונים ממקורות ישראליים..."):
             df = get_live_salary_data(job, company_size, industry, region, exp, detected_level)
-
-        with st.spinner("🧠 מחשב בנצ'מארק חכם..."):
+        with st.spinner("🧠 מפיק טבלת בנצ'מארק מקיפה..."):
             md = generate_salary_table(job, company_size, industry, region, exp, df, detected_level)
-
         st.markdown("### 📊 טבלת רכיבי שכר מלאה:")
         st.markdown(md, unsafe_allow_html=True)
-
         st.session_state["history"].append({
             "job": job,
             "level": detected_level,
@@ -188,12 +193,7 @@ if st.session_state["history"]:
     for item in reversed(st.session_state["history"]):
         job_title = item.get("job", "לא צוין")
         level = item.get("level", "לא זוהה")
-        company_size = item.get("size", "לא צוין")
-        industry = item.get("industry", "לא צוין")
-        region = item.get("region", "לא צוין")
         exp_value = item.get("exp", 0)
         exp_label = "ממוצע שוק" if exp_value == 0 else f"{exp_value} שנות ניסיון"
-        time_stamp = item.get("time", "לא צוין")
-
-        with st.expander(f"{job_title} — דרג {level} — {company_size} — {industry} — {region} — {exp_label} — {time_stamp}"):
+        with st.expander(f"{job_title} — דרג {level} — {exp_label} — {item.get('time','')}"):
             st.markdown(item.get("report", "אין דו\"ח להצגה"))
